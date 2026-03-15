@@ -18,6 +18,17 @@ export function QuestionStep({ data, onAnswer }: QuestionStepProps) {
 
   const { questionText, answerType, options, mediaUrl } = data
 
+  // Slider: discrete (has options) vs numeric (empty options, uses min/max)
+  const isNumericSlider = answerType === AnswerType.Slider && (!options || options.length === 0)
+  const sliderMin = data.min ?? 0
+  const sliderMax = data.max ?? 100
+
+  const [sliderValue, setSliderValue] = useState<number>(
+    isNumericSlider
+      ? Math.round((sliderMin + sliderMax) / 2)
+      : Math.floor(((options?.length ?? 1) - 1) / 2)
+  )
+
   // ─── Handlers ───────────────────────────────────────────────────────────────
 
   function handleOptionClick(option: AnswerOption) {
@@ -40,9 +51,6 @@ export function QuestionStep({ data, onAnswer }: QuestionStepProps) {
 
   // ─── Choice variants (SingleChoice, MultipleChoice, Slider-as-options) ───────
   const isMulti = answerType === AnswerType.MultipleChoice
-
-  console.log(data, ' answer type');
-  
 
   return (
     <Wrapper>
@@ -74,9 +82,86 @@ export function QuestionStep({ data, onAnswer }: QuestionStepProps) {
                 </OptionLabel>
               </OptionCard>
             )
-          }) : <>STIDER</>}
+          }) : null}
         </AnimatePresence>
       </OptionsGrid>
+
+      {answerType === AnswerType.Slider && (
+        <SliderWrapper
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+        >
+          <SliderCurrentLabel>
+            {isNumericSlider ? (
+              sliderValue
+            ) : (
+              <>
+                {options[sliderValue]?.icon && (
+                  <SliderEmoji>{options[sliderValue].icon}</SliderEmoji>
+                )}
+                {options[sliderValue]?.label}
+              </>
+            )}
+          </SliderCurrentLabel>
+
+          {isNumericSlider ? (
+            <SliderRow>
+              <EdgeLabel>{sliderMin}</EdgeLabel>
+              <SliderTrackWrapper>
+                <SliderInput
+                  type="range"
+                  min={sliderMin}
+                  max={sliderMax}
+                  step={1}
+                  value={sliderValue}
+                  onChange={(e) => setSliderValue(Number(e.target.value))}
+                />
+              </SliderTrackWrapper>
+              <EdgeLabel>{sliderMax}</EdgeLabel>
+            </SliderRow>
+          ) : (
+            <>
+              <SliderTrackWrapper>
+                <SliderInput
+                  type="range"
+                  min={0}
+                  max={(options?.length ?? 1) - 1}
+                  step={1}
+                  value={sliderValue}
+                  onChange={(e) => setSliderValue(Number(e.target.value))}
+                />
+              </SliderTrackWrapper>
+              <SliderLabels>
+                {options?.map((opt, i) => (
+                  <SliderTick
+                    key={opt.id}
+                    $active={i === sliderValue}
+                    onClick={() => setSliderValue(i)}
+                  >
+                    {opt.label}
+                  </SliderTick>
+                ))}
+              </SliderLabels>
+            </>
+          )}
+
+          <Button
+            fullWidth
+            size="lg"
+            icon={<ChevronRight size={18} />}
+            onClick={() =>
+              onAnswer(
+                isNumericSlider
+                  ? String(sliderValue)
+                  : options[sliderValue].value
+              )
+            }
+          >
+            Continue
+          </Button>
+        </SliderWrapper>
+      )}
 
       {isMulti && (
         <Button
@@ -100,6 +185,10 @@ const Wrapper = styled.div`
   display: flex;
   flex-direction: column;
   gap: 28px;
+
+  @media (max-width: ${({ theme }) => theme.breakpoints.mobile}) {
+    gap: 20px;
+  }
 `
 
 const QuestionText = styled.h2`
@@ -108,6 +197,10 @@ const QuestionText = styled.h2`
   color: ${({ theme }) => theme.colors.textPrimary};
   line-height: ${({ theme }) => theme.typography.lineHeights.tight};
   text-align: center;
+
+  @media (max-width: ${({ theme }) => theme.breakpoints.mobile}) {
+    font-size: ${({ theme }) => theme.typography.sizes.lg};
+  }
 `
 
 const OptionsGrid = styled.div`
@@ -125,6 +218,7 @@ const OptionCard = styled(motion.button)<{ $selected: boolean }>`
   align-items: center;
   gap: 12px;
   padding: 14px 18px;
+  min-height: 48px;
   border-radius: ${({ theme }) => theme.radii.md};
   border: 2px solid
     ${({ theme, $selected }) =>
@@ -199,4 +293,143 @@ const QuestionMedia = styled.img`
   border-radius: ${({ theme }) => theme.radii.md};
   object-fit: contain;
   align-self: center;
+
+  @media (max-width: ${({ theme }) => theme.breakpoints.mobile}) {
+    max-height: 160px;
+  }
+`
+
+// ─── Slider Styles ────────────────────────────────────────────────────────────
+
+const SliderWrapper = styled(motion.div)`
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+`
+
+const SliderCurrentLabel = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: ${({ theme }) => theme.typography.sizes.lg};
+  font-weight: ${({ theme }) => theme.typography.weights.semibold};
+  color: ${({ theme }) => theme.colors.accent};
+  min-height: 36px;
+`
+
+const SliderEmoji = styled.span`
+  font-size: 28px;
+  line-height: 1;
+`
+
+const SliderRow = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 12px;
+`
+
+const EdgeLabel = styled.span`
+  font-size: ${({ theme }) => theme.typography.sizes.sm};
+  font-weight: ${({ theme }) => theme.typography.weights.semibold};
+  color: ${({ theme }) => theme.colors.textTertiary};
+  flex-shrink: 0;
+  min-width: 24px;
+  text-align: center;
+`
+
+const SliderTrackWrapper = styled.div`
+  position: relative;
+  width: 100%;
+  flex: 1;
+  min-width: 0;
+`
+
+const SliderInput = styled.input`
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 6px;
+  border-radius: 3px;
+  background: ${({ theme }) => theme.colors.border};
+  outline: none;
+  cursor: pointer;
+
+  &::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: ${({ theme }) => theme.colors.accent};
+    border: 3px solid ${({ theme }) => theme.colors.bgSurface};
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+    cursor: pointer;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+
+    @media (max-width: ${({ theme }) => theme.breakpoints.mobile}) {
+      width: 36px;
+      height: 36px;
+    }
+  }
+
+  &::-webkit-slider-thumb:hover {
+    transform: scale(1.15);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+  }
+
+  &::-webkit-slider-thumb:active {
+    transform: scale(1.05);
+  }
+
+  &::-moz-range-thumb {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: ${({ theme }) => theme.colors.accent};
+    border: 3px solid ${({ theme }) => theme.colors.bgSurface};
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+    cursor: pointer;
+
+    @media (max-width: ${({ theme }) => theme.breakpoints.mobile}) {
+      width: 36px;
+      height: 36px;
+    }
+  }
+
+  &::-moz-range-track {
+    height: 6px;
+    border-radius: 3px;
+    background: ${({ theme }) => theme.colors.border};
+  }
+`
+
+const SliderLabels = styled.div`
+  display: flex;
+  justify-content: space-between;
+  gap: 4px;
+`
+
+const SliderTick = styled.button<{ $active: boolean }>`
+  background: none;
+  border: none;
+  padding: 4px 2px;
+  cursor: pointer;
+  font-size: ${({ theme }) => theme.typography.sizes.sm};
+  color: ${({ theme, $active }) =>
+    $active ? theme.colors.accent : theme.colors.textTertiary};
+  font-weight: ${({ theme, $active }) =>
+    $active ? theme.typography.weights.semibold : theme.typography.weights.regular};
+  transition: color 0.15s ease;
+  text-align: center;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+
+  &:hover {
+    color: ${({ theme }) => theme.colors.accent};
+  }
 `

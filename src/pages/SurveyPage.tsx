@@ -90,7 +90,7 @@ function sessionNodeToOffer(
   return {
     type: NodeType.Offer,
     headline: node.title ?? (primary?.name ?? 'Special Offer'),
-    description: primary?.description ?? node.description ?? '',
+    description: primary?.description || node.description || '',
     ctaText,
     price: primary?.price ?? undefined,
     kitName: primary?.physicalWellnessKitName ?? undefined,
@@ -435,6 +435,11 @@ const TopBar = styled.header`
   display: flex;
   align-items: center;
   gap: 16px;
+
+  @media (max-width: ${({ theme }) => theme.breakpoints.mobile}) {
+    padding: 0 12px;
+    height: 48px;
+  }
 `
 
 const BrandName = styled.span`
@@ -491,6 +496,10 @@ const ContentArea = styled.main`
   align-items: flex-start;
   justify-content: center;
   padding: 48px 24px 80px;
+
+  @media (max-width: ${({ theme }) => theme.breakpoints.mobile}) {
+    padding: 20px 12px 40px;
+  }
 `
 
 const Card = styled(motion.div)`
@@ -503,7 +512,8 @@ const Card = styled(motion.div)`
   box-shadow: ${({ theme }) => theme.shadows.md};
 
   @media (max-width: ${({ theme }) => theme.breakpoints.mobile}) {
-    padding: 28px 20px;
+    padding: 24px 16px;
+    border-radius: ${({ theme }) => theme.radii.lg};
   }
 `
 
@@ -518,6 +528,11 @@ const CenterBlock = styled.div`
   gap: 16px;
   padding: 48px 24px;
   text-align: center;
+
+  @media (max-width: ${({ theme }) => theme.breakpoints.mobile}) {
+    padding: 32px 16px;
+    gap: 12px;
+  }
 `
 
 const BigEmoji = styled.div`
@@ -549,12 +564,23 @@ const CompletionWrapper = styled(motion.div)`
 
 const CompletionIcon = styled(motion.div)`
   color: ${({ theme }) => theme.colors.success};
+
+  @media (max-width: ${({ theme }) => theme.breakpoints.mobile}) {
+    svg {
+      width: 48px;
+      height: 48px;
+    }
+  }
 `
 
 const CompletionTitle = styled.h2`
   font-size: ${({ theme }) => theme.typography.sizes.xxl};
   font-weight: ${({ theme }) => theme.typography.weights.bold};
   color: ${({ theme }) => theme.colors.textPrimary};
+
+  @media (max-width: ${({ theme }) => theme.breakpoints.mobile}) {
+    font-size: ${({ theme }) => theme.typography.sizes.xl};
+  }
 `
 
 const CompletionBody = styled.p`

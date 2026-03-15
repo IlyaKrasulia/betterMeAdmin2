@@ -69,6 +69,10 @@ const Wrapper = styled.div`
   align-items: center;
   gap: 24px;
   text-align: center;
+
+  @media (max-width: ${({ theme }) => theme.breakpoints.mobile}) {
+    gap: 18px;
+  }
 `;
 
 const IllustrationBox = styled(motion.div)`
@@ -80,6 +84,12 @@ const IllustrationBox = styled(motion.div)`
   align-items: center;
   justify-content: center;
   font-size: 48px;
+
+  @media (max-width: ${({ theme }) => theme.breakpoints.mobile}) {
+    width: 72px;
+    height: 72px;
+    font-size: 36px;
+  }
 `;
 
 const InfoImage = styled.img`
@@ -87,6 +97,11 @@ const InfoImage = styled.img`
   height: 96px;
   border-radius: ${({ theme }) => theme.radii.xl};
   object-fit: cover;
+
+  @media (max-width: ${({ theme }) => theme.breakpoints.mobile}) {
+    width: 72px;
+    height: 72px;
+  }
 `;
 
 const Title = styled(motion.h2)`
@@ -94,6 +109,10 @@ const Title = styled(motion.h2)`
   font-weight: ${({ theme }) => theme.typography.weights.bold};
   color: ${({ theme }) => theme.colors.textPrimary};
   line-height: ${({ theme }) => theme.typography.lineHeights.tight};
+
+  @media (max-width: ${({ theme }) => theme.breakpoints.mobile}) {
+    font-size: ${({ theme }) => theme.typography.sizes.lg};
+  }
 `;
 
 const Body = styled(motion.p)`
@@ -101,4 +120,8 @@ const Body = styled(motion.p)`
   color: ${({ theme }) => theme.colors.textSecondary};
   line-height: ${({ theme }) => theme.typography.lineHeights.relaxed};
   max-width: 480px;
+
+  @media (max-width: ${({ theme }) => theme.breakpoints.mobile}) {
+    font-size: ${({ theme }) => theme.typography.sizes.sm};
+  }
 `;

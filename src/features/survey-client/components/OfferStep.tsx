@@ -126,6 +126,10 @@ const Wrapper = styled.div`
   align-items: center;
   gap: 24px;
   text-align: center;
+
+  @media (max-width: ${({ theme }) => theme.breakpoints.mobile}) {
+    gap: 18px;
+  }
 `
 
 const BadgeRow = styled(motion.div)`
@@ -159,6 +163,10 @@ const OfferImage = styled.img`
   max-height: 240px;
   border-radius: ${({ theme }) => theme.radii.md};
   object-fit: contain;
+
+  @media (max-width: ${({ theme }) => theme.breakpoints.mobile}) {
+    max-height: 160px;
+  }
 `
 
 const Headline = styled(motion.h2)`
@@ -166,6 +174,10 @@ const Headline = styled(motion.h2)`
   font-weight: ${({ theme }) => theme.typography.weights.bold};
   color: ${({ theme }) => theme.colors.textPrimary};
   line-height: ${({ theme }) => theme.typography.lineHeights.tight};
+
+  @media (max-width: ${({ theme }) => theme.breakpoints.mobile}) {
+    font-size: ${({ theme }) => theme.typography.sizes.xl};
+  }
 `
 
 const Description = styled(motion.p)`
@@ -173,6 +185,10 @@ const Description = styled(motion.p)`
   color: ${({ theme }) => theme.colors.textSecondary};
   line-height: ${({ theme }) => theme.typography.lineHeights.relaxed};
   max-width: 480px;
+
+  @media (max-width: ${({ theme }) => theme.breakpoints.mobile}) {
+    font-size: ${({ theme }) => theme.typography.sizes.sm};
+  }
 `
 
 const DetailsCard = styled(motion.div)`
@@ -186,6 +202,11 @@ const DetailsCard = styled(motion.div)`
   border: 1px solid ${({ theme }) => theme.colors.border};
   background: ${({ theme }) => theme.colors.bgSurface};
   text-align: left;
+
+  @media (max-width: ${({ theme }) => theme.breakpoints.mobile}) {
+    padding: 12px 14px;
+    gap: 10px;
+  }
 `
 
 const DetailRow = styled.div`
@@ -225,6 +246,10 @@ const PriceTag = styled(motion.div)`
   font-size: ${({ theme }) => theme.typography.sizes.xxxl};
   font-weight: ${({ theme }) => theme.typography.weights.bold};
   color: ${({ theme }) => theme.colors.textPrimary};
+
+  @media (max-width: ${({ theme }) => theme.breakpoints.mobile}) {
+    font-size: ${({ theme }) => theme.typography.sizes.xxl};
+  }
 `
 
 const PriceCurrency = styled.span`
