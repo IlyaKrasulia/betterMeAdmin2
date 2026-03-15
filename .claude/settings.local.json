@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:course-decider-betterme-a2fb7653487d.herokuapp.com)",
+      "Bash(find C:UsersproduDownloadsadmin-app-BetterMe-mainadmin-app-BetterMe-main/src -type f \\\\\\(-name *.ts -o -name *.tsx -o -name *.js -o -name *.jsx \\\\\\))",
+      "Bash(grep -r \"EdgePanel\\\\|EdgeSidebar\\\\|EdgeForm\" C:UsersproduDownloadsadmin-app-BetterMe-mainadmin-app-BetterMe-main/src --include=*.ts --include=*.tsx)",
+      "Bash(grep -rn \"edge\\\\.data?\\\\.condition\\\\b\\\\|data?\\\\.condition\\\\b\\\\|\\\\.condition =\\\\|condition: EdgeCondition\\\\b\\\\|import.*Operator\\\\b\" C:/Users/produ/Downloads/admin-app-BetterMe-main/admin-app-BetterMe-main/src --include=*.ts --include=*.tsx)",
+      "Bash(xargs grep:*)",
+      "Bash(ls -la \"/c/Users/produ/Downloads/admin-app-BetterMe-main \\(3\\)/admin-app-BetterMe-main\")",
+      "Bash(find \"/c/Users/produ/Downloads/admin-app-BetterMe-main \\(3\\)/admin-app-BetterMe-main/src\" -type f -name \"*.ts\" -o -name \"*.tsx\" -o -name \"*.json\")",
+      "Bash(find \"/c/Users/produ/Downloads/admin-app-BetterMe-main \\(3\\)/admin-app-BetterMe-main/src\" -type d)",
+      "Bash(npx tsc:*)",
+      "Bash(ls \"/c/Users/produ/Downloads/admin-app-BetterMe-main \\(3\\)/admin-app-BetterMe-main/\")",
+      "Bash(find \"C:\\\\Users\\\\produ\\\\Downloads\\\\admin-app-BetterMe-main \\(3\\)\\\\admin-app-BetterMe-main\" -type f -name \"*.tsx\" -o -name \"*.ts\" -o -name \"*.jsx\" -o -name \"*.js\")",
+      "Bash(find \"C:\\\\Users\\\\produ\\\\Downloads\\\\admin-app-BetterMe-main \\(3\\)\\\\admin-app-BetterMe-main/src\" -type f \\\\\\( -name \"*.tsx\" -o -name \"*.ts\" \\\\\\))",
+      "Bash(find \"C:\\\\Users\\\\produ\\\\Downloads\\\\admin-app-BetterMe-main \\(3\\)\\\\admin-app-BetterMe-main/src/features/survey-client\" -type f)"
+    ]
+  }
+}
