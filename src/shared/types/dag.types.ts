@@ -105,7 +105,7 @@ export type EdgeOperator =
  */
 export interface EdgeConditionRule {
   attributeKey: string     // matches a question node's AttributeKey
-  operator: EdgeOperator   // comparison operator
+  operator?: EdgeOperator   // comparison operator
   value: string            // primary value (or range start for 'between')
   valueTo?: string         // range end — only used with 'between'
 }

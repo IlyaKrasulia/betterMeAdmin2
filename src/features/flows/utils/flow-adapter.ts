@@ -214,9 +214,10 @@ export function flowEdgeToEdge(dto: FlowEdgeDto): Edge {
   } else {
     const rulesLabel = conditions.rules
       .map((r) => {
-        const sym = OP_SYM[r.operator] ?? r.operator;
-        if (r.operator === "between") return `${r.attributeKey} ${sym} ${r.value}–${r.valueTo ?? "?"}`;
-        if (r.operator === "in" || r.operator === "not_in") return `${r.attributeKey} ${sym} [${r.value}]`;
+        const operator = r.operator ?? "eq";
+        const sym = OP_SYM[operator] ?? operator;
+        if (operator === "between") return `${r.attributeKey} ${sym} ${r.value}–${r.valueTo ?? "?"}`;
+        if (operator === "in" || operator === "not_in") return `${r.attributeKey} ${sym} [${r.value}]`;
         return `${r.attributeKey} ${sym} ${r.value}`;
       })
       .join(" AND ");

@@ -328,9 +328,9 @@ export const MOCK_SURVEYS: Survey[] = [
       },
     ] as Survey['nodes'],
     edges: [
-      { id: 's2-e1', source: 's2-n1', target: 's2-n2', type: 'conditionEdge', data: { label: 'always' }, condition: undefined },
-      { id: 's2-e2', source: 's2-n2', target: 's2-n3', type: 'conditionEdge', data: { label: 'always' }, condition: undefined },
-      { id: 's2-e3', source: 's2-n3', target: 's2-n4', type: 'conditionEdge', data: {}, condition: undefined },
+      { id: 's2-e1', source: 's2-n1', target: 's2-n2', type: 'conditionEdge', data: { label: 'always' } },
+      { id: 's2-e2', source: 's2-n2', target: 's2-n3', type: 'conditionEdge', data: { label: 'always' } },
+      { id: 's2-e3', source: 's2-n3', target: 's2-n4', type: 'conditionEdge', data: {} },
     ] as Survey['edges'],
   },
   {
