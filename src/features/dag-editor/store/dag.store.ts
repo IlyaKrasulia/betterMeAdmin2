@@ -48,11 +48,12 @@ function buildEdgeLabel(conditions: EdgeConditions): string {
   }
   const rulesLabel = conditions.rules
     .map((r) => {
-      const op = OP_LABELS[r.operator] ?? r.operator
-      if (r.operator === 'between') {
+      const operator = r.operator ?? 'eq'
+      const op = OP_LABELS[operator] ?? operator
+      if (operator === 'between') {
         return `${r.attributeKey} ${op} ${r.value}–${r.valueTo ?? '?'}`
       }
-      if (r.operator === 'in' || r.operator === 'not_in') {
+      if (operator === 'in' || operator === 'not_in') {
         return `${r.attributeKey} ${op} [${r.value}]`
       }
       return `${r.attributeKey} ${op} ${r.value}`

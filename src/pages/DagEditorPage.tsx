@@ -345,7 +345,7 @@ export function DagEditorPage() {
                 sourceNodeId: resolveNodeId(edge.source),
                 targetNodeId: resolveNodeId(edge.target),
                 priority: getEdgeConditions(edge).priority,
-                conditionsJson: toConditionsJson(edge),
+                conditions: toConditionsJson(edge),
               },
             }),
           ),
@@ -364,7 +364,7 @@ export function DagEditorPage() {
                   edgeId: edge.id,
                   data: {
                     priority: getEdgeConditions(edge).priority,
-                    conditionsJson: toConditionsJson(edge),
+                    conditions: toConditionsJson(edge),
                   },
                 }),
               ];

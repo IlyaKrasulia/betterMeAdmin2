@@ -220,7 +220,7 @@ export interface EdgeDetail {
   sourceNodeId: string
   targetNodeId: string
   priority: number
-  conditionsJson: string | null  // JSON string from POST/PUT responses
+  conditions: string | null  // JSON string from POST/PUT responses
   createdAt: string
 }
 
@@ -229,12 +229,12 @@ export interface CreateEdgeRequest {
   sourceNodeId: string
   targetNodeId: string
   priority?: number
-  conditionsJson?: string | null
+  conditions?: string | null
 }
 
 export interface UpdateEdgeRequest {
   priority?: number
-  conditionsJson?: string | null
+  conditions?: string | null
 }
 
 // ─── Admin — Offers ───────────────────────────────────────────────────────────
@@ -375,7 +375,7 @@ export interface SessionCurrentNode {
   mediaUrl: string | null
   options: ContentOptionDto[]
   offers: SessionNodeOffer[]
-  answerType: AnswerType
+  answerType?: AnswerType
 }
 
 /** Unified session response shape returned by start, answer, back, and get endpoints */
