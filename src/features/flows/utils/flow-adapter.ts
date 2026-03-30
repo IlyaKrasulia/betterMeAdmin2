@@ -98,39 +98,21 @@ export function flowNodeToNode(dto: FlowNodeDto): Node<DagNodeData> {
     }
     case "Offer":
     default: {
-      // Try to read offer fields from the linked offer first (nodeOffers),
-      // then fall back to legacy mediaUrl JSON encoding.
-      let ctaText = "Get Started";
-      let price: number | undefined;
-      let kitName: string | undefined;
-      let kitContents: string | undefined;
-
-      // Legacy: ctaText, price, kitName, kitContents encoded in mediaUrl JSON
-      if (dto.mediaUrl) {
-        try {
-          const meta = JSON.parse(dto.mediaUrl) as {
-            ctaText?: string;
-            price?: number;
-            kitName?: string;
-            kitContents?: string;
-          };
-          if (typeof meta.ctaText === "string") ctaText = meta.ctaText;
-          if (typeof meta.price === "number") price = meta.price;
-          if (typeof meta.kitName === "string") kitName = meta.kitName;
-          if (typeof meta.kitContents === "string") kitContents = meta.kitContents;
-        } catch {
-          // mediaUrl is a plain URL (old data) — leave defaults
-        }
-      }
+      // Read offer details from the primary linked offer returned by the API.
+      // Fall back to the first offer if none is marked primary.
+      const primaryOffer =
+        (dto.nodeOffers ?? []).find((o) => o.isPrimary) ??
+        dto.nodeOffers?.[0] ??
+        null;
 
       const d: OfferNodeData = {
         type: NodeType.Offer,
         headline: dto.title,
         description: dto.description ?? "",
-        ctaText,
-        price,
-        kitName,
-        kitContents,
+        ctaText: primaryOffer?.ctaText ?? "Get Started",
+        price: primaryOffer?.price ?? undefined,
+        kitName: primaryOffer?.physicalWellnessKitName ?? undefined,
+        kitContents: primaryOffer?.physicalWellnessKitItems ?? undefined,
       };
       data = d;
       break;
@@ -296,6 +278,7 @@ export function nodeToCreateRequest(
           price: data.price,
           physicalWellnessKitName: data.kitName || undefined,
           physicalWellnessKitItems: data.kitContents || undefined,
+          description: data.description || undefined,
         },
       };
     }
@@ -337,10 +320,12 @@ export function nodeToUpdateRequest(
         title: data.headline,
         description: data.description || undefined,
         offer: {
+          name: data.headline,
           ctaText: data.ctaText || undefined,
           price: data.price,
           physicalWellnessKitName: data.kitName || undefined,
           physicalWellnessKitItems: data.kitContents || undefined,
+          description: data.description || undefined,
         },
       };
     }
