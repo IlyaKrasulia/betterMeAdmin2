@@ -254,8 +254,8 @@ export interface OfferDto {
   description: string | null
   duration: string | null
   digitalContent: string | null
-  kitName: string | null
-  kitContents: string | null
+  physicalWellnessKitName: string | null
+  physicalWellnessKitItems: string | null
   price: number
   imageUrl: string | null
   ctaText: string | null
@@ -269,8 +269,8 @@ export interface CreateOfferRequest {
   description?: string
   duration?: string
   digitalContent?: string
-  kitName?: string
-  kitContents?: string
+  physicalWellnessKitName?: string
+  physicalWellnessKitItems?: string
   price?: number
   imageUrl?: string
   ctaText?: string
@@ -283,8 +283,8 @@ export interface UpdateOfferRequest {
   description?: string
   duration?: string
   digitalContent?: string
-  kitName?: string
-  kitContents?: string
+  physicalWellnessKitName?: string
+  physicalWellnessKitItems?: string
   price?: number
   imageUrl?: string
   ctaText?: string

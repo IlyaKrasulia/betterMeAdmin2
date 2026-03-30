@@ -108,11 +108,18 @@ export function flowNodeToNode(dto: FlowNodeDto): Node<DagNodeData> {
       const d: OfferNodeData = {
         type: NodeType.Offer,
         headline: dto.title,
-        description: dto.description ?? "",
+        // Prefer the offer-level description (stored in nodeOffers) over the
+        // node-level description field — the backend persists the user-edited
+        // description on the offer record, not on the node record itself.
+        description: primaryOffer?.description ?? dto.description ?? "",
         ctaText: primaryOffer?.ctaText ?? "Get Started",
+        ctaUrl: primaryOffer?.ctaUrl ?? undefined,
         price: primaryOffer?.price ?? undefined,
+        imageUrl: primaryOffer?.imageUrl ?? undefined,
         kitName: primaryOffer?.physicalWellnessKitName ?? undefined,
         kitContents: primaryOffer?.physicalWellnessKitItems ?? undefined,
+        nodeOfferId: primaryOffer?.id ?? undefined,
+        offerId: primaryOffer?.offerId ?? undefined,
       };
       data = d;
       break;
@@ -275,7 +282,9 @@ export function nodeToCreateRequest(
         offer: {
           name: data.headline,
           ctaText: data.ctaText || undefined,
+          ctaUrl: data.ctaUrl || undefined,
           price: data.price,
+          imageUrl: data.imageUrl || undefined,
           physicalWellnessKitName: data.kitName || undefined,
           physicalWellnessKitItems: data.kitContents || undefined,
           description: data.description || undefined,
@@ -322,7 +331,9 @@ export function nodeToUpdateRequest(
         offer: {
           name: data.headline,
           ctaText: data.ctaText || undefined,
+          ctaUrl: data.ctaUrl || undefined,
           price: data.price,
+          imageUrl: data.imageUrl || undefined,
           physicalWellnessKitName: data.kitName || undefined,
           physicalWellnessKitItems: data.kitContents || undefined,
           description: data.description || undefined,
