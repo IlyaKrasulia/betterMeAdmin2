@@ -32,6 +32,13 @@ export interface NodeOfferDto {
   isPrimary: boolean
   offerName: string
   offerSlug: string
+  ctaText: string | null
+  ctaUrl: string | null
+  price: number | null
+  physicalWellnessKitName: string | null
+  physicalWellnessKitItems: string | null
+  description: string | null
+  imageUrl: string | null
 }
 
 export type FlowNodeType = 'question' | 'info_page' | 'offer'
@@ -153,6 +160,7 @@ export interface CreateNodeRequest {
 }
 
 export interface UpdateInlineOfferRequest {
+  name?: string
   ctaText?: string
   ctaUrl?: string
   price?: number

@@ -34,6 +34,21 @@ const infoDto: FlowNodeDto = {
   nodeOffers: [],
 }
 
+const baseNodeOffer = {
+  id: 'no1',
+  offerId: 'offer1',
+  isPrimary: true,
+  offerName: 'Special Plan',
+  offerSlug: 'special-plan',
+  ctaText: null,
+  ctaUrl: null,
+  price: null,
+  physicalWellnessKitName: null,
+  physicalWellnessKitItems: null,
+  description: null,
+  imageUrl: null,
+}
+
 const offerDto: FlowNodeDto = {
   id: 'n3',
   type: 'Offer',
@@ -81,6 +96,54 @@ describe('flowNodeToNode', () => {
     if (node.data.type === NodeType.Offer) {
       expect(node.data.headline).toBe('Special Plan')
       expect(node.data.description).toBe('Best offer ever')
+      // no nodeOffers → defaults
+      expect(node.data.ctaText).toBe('Get Started')
+      expect(node.data.price).toBeUndefined()
+      expect(node.data.kitName).toBeUndefined()
+      expect(node.data.kitContents).toBeUndefined()
+    }
+  })
+
+  it('reads ctaText, price and kit info from the primary nodeOffer', () => {
+    const dto: FlowNodeDto = {
+      ...offerDto,
+      nodeOffers: [
+        {
+          ...baseNodeOffer,
+          ctaText: 'Buy Now',
+          price: 29.99,
+          physicalWellnessKitName: 'Wellness Kit',
+          physicalWellnessKitItems: 'Yoga mat, resistance band',
+        },
+      ],
+    }
+    const node = flowNodeToNode(dto)
+    if (node.data.type === NodeType.Offer) {
+      expect(node.data.ctaText).toBe('Buy Now')
+      expect(node.data.price).toBe(29.99)
+      expect(node.data.kitName).toBe('Wellness Kit')
+      expect(node.data.kitContents).toBe('Yoga mat, resistance band')
+    }
+  })
+
+  it('falls back to first nodeOffer when none is marked isPrimary', () => {
+    const dto: FlowNodeDto = {
+      ...offerDto,
+      nodeOffers: [
+        {
+          ...baseNodeOffer,
+          isPrimary: false,
+          ctaText: 'Start',
+          price: 9.99,
+          physicalWellnessKitName: null,
+          physicalWellnessKitItems: null,
+        },
+      ],
+    }
+    const node = flowNodeToNode(dto)
+    if (node.data.type === NodeType.Offer) {
+      expect(node.data.ctaText).toBe('Start')
+      expect(node.data.price).toBe(9.99)
     }
   })
 
@@ -248,11 +311,20 @@ describe('nodeToCreateRequest', () => {
         description: 'Only today',
         ctaText: 'Buy',
         price: 9.99,
+        kitName: 'Wellness Kit',
+        kitContents: 'Yoga mat',
       },
     }
     const req = nodeToCreateRequest(node)
     expect(req.type).toBe('Offer')
     expect(req.title).toBe('Big Deal')
+    expect(req.description).toBe('Only today')
+    expect(req.offer?.name).toBe('Big Deal')
+    expect(req.offer?.ctaText).toBe('Buy')
+    expect(req.offer?.price).toBe(9.99)
+    expect(req.offer?.physicalWellnessKitName).toBe('Wellness Kit')
+    expect(req.offer?.physicalWellnessKitItems).toBe('Yoga mat')
+    expect(req.offer?.description).toBe('Only today')
   })
 })
 
@@ -297,5 +369,31 @@ describe('nodeToUpdateRequest', () => {
     expect(meta.answerType).toBe('slider')
     expect(meta.min).toBe(0)
     expect(meta.max).toBe(10)
+  })
+
+  it('builds an UpdateNodeRequest from an offer node with name and description in offer', () => {
+    const node: Node<DagNodeData> = {
+      id: 'n3',
+      type: NodeType.Offer,
+      position: { x: 0, y: 0 },
+      data: {
+        type: NodeType.Offer,
+        headline: 'Updated Deal',
+        description: 'New description',
+        ctaText: 'Get It',
+        price: 19.99,
+        kitName: 'Kit A',
+        kitContents: 'Item 1, Item 2',
+      },
+    }
+    const req = nodeToUpdateRequest(node)
+    expect(req.title).toBe('Updated Deal')
+    expect(req.description).toBe('New description')
+    expect(req.offer?.name).toBe('Updated Deal')
+    expect(req.offer?.ctaText).toBe('Get It')
+    expect(req.offer?.price).toBe(19.99)
+    expect(req.offer?.physicalWellnessKitName).toBe('Kit A')
+    expect(req.offer?.physicalWellnessKitItems).toBe('Item 1, Item 2')
+    expect(req.offer?.description).toBe('New description')
   })
 })
