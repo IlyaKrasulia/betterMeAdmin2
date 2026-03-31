@@ -95,12 +95,15 @@ describe('flowNodeToNode', () => {
     expect(node.type).toBe(NodeType.Offer)
     if (node.data.type === NodeType.Offer) {
       expect(node.data.headline).toBe('Special Plan')
+      // no nodeOffers → falls back to node-level description
       expect(node.data.description).toBe('Best offer ever')
       // no nodeOffers → defaults
       expect(node.data.ctaText).toBe('Get Started')
       expect(node.data.price).toBeUndefined()
       expect(node.data.kitName).toBeUndefined()
       expect(node.data.kitContents).toBeUndefined()
+      expect(node.data.nodeOfferId).toBeUndefined()
+      expect(node.data.offerId).toBeUndefined()
     }
   })
 
@@ -111,18 +114,61 @@ describe('flowNodeToNode', () => {
         {
           ...baseNodeOffer,
           ctaText: 'Buy Now',
+          ctaUrl: 'https://buy.example.com',
           price: 29.99,
           physicalWellnessKitName: 'Wellness Kit',
           physicalWellnessKitItems: 'Yoga mat, resistance band',
+          description: 'Offer-level description',
+          imageUrl: 'https://example.com/img.png',
         },
       ],
     }
     const node = flowNodeToNode(dto)
     if (node.data.type === NodeType.Offer) {
       expect(node.data.ctaText).toBe('Buy Now')
+      expect(node.data.ctaUrl).toBe('https://buy.example.com')
       expect(node.data.price).toBe(29.99)
       expect(node.data.kitName).toBe('Wellness Kit')
       expect(node.data.kitContents).toBe('Yoga mat, resistance band')
+      // description prefers the offer-level value over the node-level value
+      expect(node.data.description).toBe('Offer-level description')
+      expect(node.data.imageUrl).toBe('https://example.com/img.png')
+      expect(node.data.nodeOfferId).toBe('no1')
+      expect(node.data.offerId).toBe('offer1')
+    }
+  })
+
+  it('prefers offer-level description over node-level description', () => {
+    const dto: FlowNodeDto = {
+      ...offerDto,
+      description: 'Node-level description',
+      nodeOffers: [
+        {
+          ...baseNodeOffer,
+          description: 'Offer-level description',
+        },
+      ],
+    }
+    const node = flowNodeToNode(dto)
+    if (node.data.type === NodeType.Offer) {
+      expect(node.data.description).toBe('Offer-level description')
+    }
+  })
+
+  it('falls back to node-level description when offer description is null', () => {
+    const dto: FlowNodeDto = {
+      ...offerDto,
+      description: 'Node-level description',
+      nodeOffers: [
+        {
+          ...baseNodeOffer,
+          description: null,
+        },
+      ],
+    }
+    const node = flowNodeToNode(dto)
+    if (node.data.type === NodeType.Offer) {
+      expect(node.data.description).toBe('Node-level description')
     }
   })
 
@@ -310,7 +356,9 @@ describe('nodeToCreateRequest', () => {
         headline: 'Big Deal',
         description: 'Only today',
         ctaText: 'Buy',
+        ctaUrl: 'https://buy.example.com',
         price: 9.99,
+        imageUrl: 'https://example.com/img.png',
         kitName: 'Wellness Kit',
         kitContents: 'Yoga mat',
       },
@@ -321,7 +369,9 @@ describe('nodeToCreateRequest', () => {
     expect(req.description).toBe('Only today')
     expect(req.offer?.name).toBe('Big Deal')
     expect(req.offer?.ctaText).toBe('Buy')
+    expect(req.offer?.ctaUrl).toBe('https://buy.example.com')
     expect(req.offer?.price).toBe(9.99)
+    expect(req.offer?.imageUrl).toBe('https://example.com/img.png')
     expect(req.offer?.physicalWellnessKitName).toBe('Wellness Kit')
     expect(req.offer?.physicalWellnessKitItems).toBe('Yoga mat')
     expect(req.offer?.description).toBe('Only today')
@@ -381,7 +431,9 @@ describe('nodeToUpdateRequest', () => {
         headline: 'Updated Deal',
         description: 'New description',
         ctaText: 'Get It',
+        ctaUrl: 'https://get.example.com',
         price: 19.99,
+        imageUrl: 'https://example.com/img.png',
         kitName: 'Kit A',
         kitContents: 'Item 1, Item 2',
       },
@@ -391,7 +443,9 @@ describe('nodeToUpdateRequest', () => {
     expect(req.description).toBe('New description')
     expect(req.offer?.name).toBe('Updated Deal')
     expect(req.offer?.ctaText).toBe('Get It')
+    expect(req.offer?.ctaUrl).toBe('https://get.example.com')
     expect(req.offer?.price).toBe(19.99)
+    expect(req.offer?.imageUrl).toBe('https://example.com/img.png')
     expect(req.offer?.physicalWellnessKitName).toBe('Kit A')
     expect(req.offer?.physicalWellnessKitItems).toBe('Item 1, Item 2')
     expect(req.offer?.description).toBe('New description')

@@ -59,9 +59,17 @@ export interface OfferNodeData {
   headline: string
   description: string
   ctaText: string
+  /** URL destination for the call-to-action button. */
+  ctaUrl?: string
   price?: number
+  /** URL of the image to display for this offer. */
+  imageUrl?: string
   kitName?: string
   kitContents?: string
+  /** ID of the NodeOffer link record (populated when loaded from API). */
+  nodeOfferId?: string
+  /** ID of the linked Offer entity (populated when loaded from API). */
+  offerId?: string
 }
 
 export type DagNodeData = QuestionNodeData | InfoNodeData | OfferNodeData

@@ -331,6 +331,26 @@ function OfferProperties({ node }: { node: Node<DagNodeData> }) {
         }
         placeholder="Items in the kit"
       />
+      <Input
+        label="Image URL (optional)"
+        value={data.imageUrl ?? ""}
+        onChange={(e) =>
+          updateNodeData(node.id, {
+            imageUrl: e.target.value || undefined,
+          } as Partial<DagNodeData>)
+        }
+        placeholder="https://..."
+      />
+      <Input
+        label="CTA URL (optional)"
+        value={data.ctaUrl ?? ""}
+        onChange={(e) =>
+          updateNodeData(node.id, {
+            ctaUrl: e.target.value || undefined,
+          } as Partial<DagNodeData>)
+        }
+        placeholder="https://..."
+      />
     </FieldGroup>
   );
 }
