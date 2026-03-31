@@ -46,43 +46,19 @@ export function flowNodeToNode(dto: FlowNodeDto): Node<DagNodeData> {
   let data: DagNodeData;
   switch (dto.type) {
     case "Question": {
-      // answerType, min and max are serialised into `description` as JSON
-      // because the backend node model has no dedicated columns for them.
-      let answerType: AnswerType = AnswerType.SingleChoice;
-      let min: number | undefined;
-      let max: number | undefined;
-      if (dto.description) {
-        try {
-          const meta = JSON.parse(dto.description) as {
-            answerType?: string;
-            min?: number;
-            max?: number;
-          };
-          if (
-            typeof meta.answerType === "string" &&
-            VALID_ANSWER_TYPES.has(meta.answerType)
-          ) {
-            answerType = meta.answerType as AnswerType;
-          }
-          if (typeof meta.min === "number") min = meta.min;
-          if (typeof meta.max === "number") max = meta.max;
-        } catch {
-          // description is plain text (old data) — leave defaults
-        }
-      }
       const d: QuestionNodeData = {
         type: NodeType.Question,
         questionText: dto.title,
         attribute: (dto.attributeKey as AttributeKey) ?? AttributeKey.Goal,
-        answerType,
+        answerType: dto.answerType,
         options: (dto.options ?? []).map((o) => ({
           id: o.id,
           label: o.label,
           value: o.value,
         })),
+        max: dto.answerType === AnswerType.Slider ? dto.sliderMax : undefined,
+        min: dto.answerType === AnswerType.Slider ? dto.sliderMin : undefined,
       };
-      if (min !== undefined) d.min = min;
-      if (max !== undefined) d.max = max;
       data = d;
       break;
     }
@@ -108,18 +84,15 @@ export function flowNodeToNode(dto: FlowNodeDto): Node<DagNodeData> {
       const d: OfferNodeData = {
         type: NodeType.Offer,
         headline: dto.title,
-        // Prefer the offer-level description (stored in nodeOffers) over the
-        // node-level description field — the backend persists the user-edited
-        // description on the offer record, not on the node record itself.
-        description: primaryOffer?.description ?? dto.description ?? "",
-        ctaText: primaryOffer?.ctaText ?? "Get Started",
-        ctaUrl: primaryOffer?.ctaUrl ?? undefined,
-        price: primaryOffer?.price ?? undefined,
-        imageUrl: primaryOffer?.imageUrl ?? undefined,
-        kitName: primaryOffer?.physicalWellnessKitName ?? undefined,
-        kitContents: primaryOffer?.physicalWellnessKitItems ?? undefined,
+        description: primaryOffer?.offer.description ?? dto.description ?? "",
+        ctaText: primaryOffer?.offer.ctaText ?? "Get Started",
+        ctaUrl: primaryOffer?.offer.ctaUrl ?? undefined,
+        price: primaryOffer?.offer.price ?? undefined,
+        imageUrl: primaryOffer?.offer.imageUrl ?? undefined,
+        kitName: primaryOffer?.offer.physicalWellnessKitName ?? undefined,
+        kitContents: primaryOffer?.offer.physicalWellnessKitItems ?? undefined,
         nodeOfferId: primaryOffer?.id ?? undefined,
-        offerId: primaryOffer?.offerId ?? undefined,
+        offerId: primaryOffer?.offer.offerId ?? undefined,
       };
       data = d;
       break;
@@ -253,18 +226,17 @@ export function nodeToCreateRequest(
 
   switch (data.type) {
     case NodeType.Question: {
-      // answerType, min and max are serialised into `description` as JSON
-      // because the backend node model has no dedicated columns for them.
-      const meta: { answerType: string; min?: number; max?: number } = {
-        answerType: data.answerType,
-      };
-      if (data.min !== undefined) meta.min = data.min;
-      if (data.max !== undefined) meta.max = data.max;
+      let slider = data.type === NodeType.Question && data.answerType === AnswerType.Slider
+      ? { SliderMin: data.min ?? 0, SliderMax: data.max ?? 10 }
+      : {};
+
       return {
         ...base,
         title: data.questionText,
         attributeKey: data.attribute,
-        description: JSON.stringify(meta),
+        description: '',
+        answerType: data.answerType,
+        ...slider,
       };
     }
     case NodeType.Info:
@@ -305,17 +277,18 @@ export function nodeToUpdateRequest(
 ): UpdateNodeRequest {
   const { data } = node;
 
+    let slider = data.type === NodeType.Question && data.answerType === AnswerType.Slider
+      ? { SliderMin: data.min ?? 0, SliderMax: data.max ?? 10 }
+      : {};
+
   switch (data.type) {
     case NodeType.Question: {
-      const meta: { answerType: string; min?: number; max?: number } = {
-        answerType: data.answerType,
-      };
-      if (data.min !== undefined) meta.min = data.min;
-      if (data.max !== undefined) meta.max = data.max;
       return {
         title: data.questionText,
         attributeKey: data.attribute,
-        description: JSON.stringify(meta),
+        description: '',
+        answerType: data.answerType,
+        ...slider,
       };
     }
     case NodeType.Info:

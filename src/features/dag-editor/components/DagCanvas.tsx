@@ -163,6 +163,9 @@ export function DagCanvas() {
     [theme],
   );
 
+  console.log(edges);
+  
+
   return (
     <EditorLayout>
       <NodePalette onDragStart={onDragStart} />

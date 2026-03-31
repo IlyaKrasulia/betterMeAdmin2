@@ -21,9 +21,9 @@ export enum AttributeKey {
 }
 
 export enum AnswerType {
-  SingleChoice = 'single_choice',
-  MultipleChoice = 'multiple_choice',
-  Slider = 'slider',
+  SingleChoice = 'SingleChoice',
+  MultipleChoice = 'MultipleChoice',
+  Slider = 'Slider',
 }
 
 export interface AnswerOption {

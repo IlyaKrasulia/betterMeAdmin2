@@ -164,11 +164,21 @@ export function DagEditorPage() {
     // Both have rules — compare them
     try {
       const parsed = JSON.parse(orig.conditions!) as unknown;
-      type NormRule = { attributeKey: string; operator: string; value: string; valueTo?: string };
+      type NormRule = {
+        attributeKey: string;
+        operator: string;
+        value: string;
+        valueTo?: string;
+      };
       let origRules: NormRule[];
 
       if (Array.isArray(parsed)) {
-        type BR = { AttributeKey?: string; Operator?: string; Value?: string; ValueTo?: string };
+        type BR = {
+          AttributeKey?: string;
+          Operator?: string;
+          Value?: string;
+          ValueTo?: string;
+        };
         origRules = (parsed as BR[]).map((r) => ({
           attributeKey: r.AttributeKey ?? "",
           operator: r.Operator ?? "eq",
@@ -180,7 +190,9 @@ export function DagEditorPage() {
         typeof parsed === "object" &&
         (parsed as { rules?: unknown }).rules
       ) {
-        const legacy = parsed as { rules: Array<{ attribute?: string; op?: string; value?: string }> };
+        const legacy = parsed as {
+          rules: Array<{ attribute?: string; op?: string; value?: string }>;
+        };
         origRules = legacy.rules.map((r) => ({
           attributeKey: r.attribute ?? "",
           operator: r.op ?? "eq",
@@ -219,6 +231,8 @@ export function DagEditorPage() {
 
       // Map client-generated IDs to server-assigned IDs for newly created nodes
       const clientToServerId = new Map<string, string>();
+
+      console.log(originalEdgeMap, " => original edges");
 
       // ── 1. Create new nodes ────────────────────────────────────────────
       for (const node of nodes) {
@@ -338,7 +352,7 @@ export function DagEditorPage() {
       await Promise.all(
         edges
           .filter((e) => !originalEdgeMap.has(e.id))
-          .map((edge) =>
+          .map((edge) => {
             createEdge({
               flowId: surveyId,
               data: {
@@ -347,8 +361,8 @@ export function DagEditorPage() {
                 priority: getEdgeConditions(edge).priority,
                 conditions: toConditionsJson(edge),
               },
-            }),
-          ),
+            });
+          }),
       );
 
       // ── 7. Update existing edges whose conditions changed ─────────────
@@ -358,11 +372,25 @@ export function DagEditorPage() {
           .flatMap((edge) => {
             const orig = originalEdgeMap.get(edge.id)!;
             if (edgeConditionChanged(edge, orig)) {
+              console.log(
+                {
+                  flowId: surveyId,
+                  edgeId: edge.id,
+                  data: {
+                    operator: "or",
+                    priority: getEdgeConditions(edge).priority,
+                    rules: JSON.parse(toConditionsJson(edge) ?? "null"),
+                  },
+                },
+                " => updateEdge payload",
+              );
+
               return [
                 updateEdge({
                   flowId: surveyId,
                   edgeId: edge.id,
                   data: {
+                    operator: "or",
                     priority: getEdgeConditions(edge).priority,
                     conditions: toConditionsJson(edge),
                   },
@@ -391,7 +419,12 @@ export function DagEditorPage() {
         originalEdgesRef.current = typedFlow.edges;
         const dagNodes = typedFlow.nodes.map(flowNodeToNode);
         const dagEdges = typedFlow.edges.map(flowEdgeToEdge);
-        loadSurvey(typedFlow.id, dagNodes, dagEdges, typedFlow.entryNodeId ?? null);
+        loadSurvey(
+          typedFlow.id,
+          dagNodes,
+          dagEdges,
+          typedFlow.entryNodeId ?? null,
+        );
       }
 
       markSaved();

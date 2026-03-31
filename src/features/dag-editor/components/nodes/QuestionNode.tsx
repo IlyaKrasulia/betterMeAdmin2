@@ -7,6 +7,84 @@ import { HelpCircle, PlayCircle } from "lucide-react";
 import type { QuestionNodeData } from "@shared/types/dag.types";
 import { useDagStore } from "../../store/dag.store";
 
+export const QuestionNode = memo(function QuestionNode({
+  id,
+  data,
+  selected,
+}: NodeProps<QuestionNodeData>) {
+  const options = data.options || [];
+
+  const theme = useTheme();
+  const accent = theme.colors.nodeQuestion;
+  const isEntry = useDagStore((s) => s.entryNodeId === id);
+  const visible = options.slice(0, 4);
+  const extra = options.length - 4;
+
+  return (
+    <>
+      <Handle
+        type="target"
+        position={Position.Left}
+        style={{
+          width: 12,
+          height: 12,
+          background: accent,
+          border: "2px solid white",
+          boxShadow: `0 0 0 2px ${accent}`,
+        }}
+      />
+      {isEntry && (
+        <EntryBadge $color={accent}>
+          <PlayCircle size={9} strokeWidth={2.5} />
+          ENTRY
+        </EntryBadge>
+      )}
+      <Card $selected={!!selected} $accent={accent}>
+        <Header $bg={accent}>
+          <HelpCircle size={13} color="white" strokeWidth={2.5} />
+          <HeaderLabel>Question</HeaderLabel>
+        </Header>
+        <Body>
+          <QuestionText>
+            {data.questionText || "Untitled question"}
+          </QuestionText>
+          {options.length > 0 && (
+            <OptionsGrid>
+              {visible.map((opt) => (
+                <OptionChip key={opt.id} $color={accent} title={opt.label}>
+                  {opt.icon && <span>{opt.icon}</span>}
+                  {opt.label}
+                </OptionChip>
+              ))}
+              {extra > 0 && (
+                <OptionChip $color={accent}>+{extra} more</OptionChip>
+              )}
+            </OptionsGrid>
+          )}
+          <Footer>
+            <AttrBadge>@{data.attribute}</AttrBadge>
+            {data.answerType && (
+              <TypeLabel>{data.answerType}</TypeLabel>
+            )}
+          </Footer>
+        </Body>
+      </Card>
+      <Handle
+        type="source"
+        position={Position.Right}
+        style={{
+          width: 12,
+          height: 12,
+          background: accent,
+          border: "2px solid white",
+          boxShadow: `0 0 0 2px ${accent}`,
+        }}
+      />
+    </>
+  );
+});
+
+
 const Card = styled.div<{ $selected: boolean; $accent: string }>`
   background: ${({ theme }) => theme.colors.bgSurface};
   border: 2px solid
@@ -116,80 +194,3 @@ const EntryBadge = styled.div<{ $color: string }>`
   border-radius: 6px 6px 0 0;
   pointer-events: none;
 `;
-
-export const QuestionNode = memo(function QuestionNode({
-  id,
-  data,
-  selected,
-}: NodeProps<QuestionNodeData>) {
-  const options = data.options || [];
-
-  const theme = useTheme();
-  const accent = theme.colors.nodeQuestion;
-  const isEntry = useDagStore((s) => s.entryNodeId === id);
-  const visible = options.slice(0, 4);
-  const extra = options.length - 4;
-
-  return (
-    <>
-      <Handle
-        type="target"
-        position={Position.Left}
-        style={{
-          width: 12,
-          height: 12,
-          background: accent,
-          border: "2px solid white",
-          boxShadow: `0 0 0 2px ${accent}`,
-        }}
-      />
-      {isEntry && (
-        <EntryBadge $color={accent}>
-          <PlayCircle size={9} strokeWidth={2.5} />
-          ENTRY
-        </EntryBadge>
-      )}
-      <Card $selected={!!selected} $accent={accent}>
-        <Header $bg={accent}>
-          <HelpCircle size={13} color="white" strokeWidth={2.5} />
-          <HeaderLabel>Question</HeaderLabel>
-        </Header>
-        <Body>
-          <QuestionText>
-            {data.questionText || "Untitled question"}
-          </QuestionText>
-          {options.length > 0 && (
-            <OptionsGrid>
-              {visible.map((opt) => (
-                <OptionChip key={opt.id} $color={accent} title={opt.label}>
-                  {opt.icon && <span>{opt.icon}</span>}
-                  {opt.label}
-                </OptionChip>
-              ))}
-              {extra > 0 && (
-                <OptionChip $color={accent}>+{extra} more</OptionChip>
-              )}
-            </OptionsGrid>
-          )}
-          <Footer>
-            <AttrBadge>@{data.attribute}</AttrBadge>
-            {data.answerType && (
-              <TypeLabel>{data.answerType.replace(/_/g, " ")}</TypeLabel>
-            )}
-          </Footer>
-        </Body>
-      </Card>
-      <Handle
-        type="source"
-        position={Position.Right}
-        style={{
-          width: 12,
-          height: 12,
-          background: accent,
-          border: "2px solid white",
-          boxShadow: `0 0 0 2px ${accent}`,
-        }}
-      />
-    </>
-  );
-});
