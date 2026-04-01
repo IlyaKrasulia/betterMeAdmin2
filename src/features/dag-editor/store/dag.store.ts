@@ -76,11 +76,11 @@ export const useDagStore = create<DagState>((set, get) => ({
   loadSurvey: (surveyId, nodes, edges, entryNodeId = null) =>
     set({ surveyId, nodes, edges, entryNodeId, selectedNodeId: null, selectedEdgeId: null, isDirty: false }),
 
-  onNodesChange: (changes) =>
+  onNodesChange: (changes) => {
     set((s) => ({
       nodes: applyNodeChanges(changes, s.nodes) as Node<DagNodeData>[],
       isDirty: true,
-    })),
+    }))},
 
   onEdgesChange: (changes) =>
     set((s) => ({

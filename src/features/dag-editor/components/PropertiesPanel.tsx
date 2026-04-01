@@ -1,29 +1,37 @@
 import { useMemo, useState } from "react";
 import styled from "styled-components";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Plus, Trash2, GitBranch, Infinity, LogIn, CheckCircle2 } from "lucide-react";
+import {
+  X,
+  Plus,
+  Trash2,
+  GitBranch,
+  Infinity,
+  LogIn,
+  CheckCircle2,
+} from "lucide-react";
+import { useLocation, useParams } from "@tanstack/react-router";
 import type { Node, Edge } from "reactflow";
+
 import { Input } from "@shared/ui/Input";
 import { Select } from "@shared/ui/Select";
 import { Button } from "@shared/ui/Button";
-import { useSetEntryNode } from "@features/flows/hooks/useFlows";
+import { useFlow, useSetEntryNode } from "@features/flows/hooks/useFlows";
 import {
   useDagStore,
   selectSelectedNode,
   selectSelectedEdge,
 } from "../store/dag.store";
-import type {
+import {
   DagNodeData,
   AnswerOption,
   EdgeConditions,
   EdgeConditionRule,
   EdgeOperator,
+  ValueKind,
+  AttributeKeyOption,
 } from "@shared/types/dag.types";
-import {
-  NodeType,
-  AttributeKey,
-  AnswerType,
-} from "@shared/types/dag.types";
+import { NodeType, AttributeKey, AnswerType } from "@shared/types/dag.types";
 
 // ── Attribute type detection ─────────────────────────────────────────────────
 
@@ -47,23 +55,23 @@ interface AttrMeta {
 // Operators grouped by attribute kind
 const OPERATORS: Record<AttrKind, { value: EdgeOperator; label: string }[]> = {
   numeric: [
-    { value: "eq",      label: "= equals" },
-    { value: "neq",     label: "≠ not equals" },
-    { value: "gt",      label: "> greater than" },
-    { value: "gte",     label: "≥ greater than or equal" },
-    { value: "lt",      label: "< less than" },
-    { value: "lte",     label: "≤ less than or equal" },
+    { value: "eq", label: "= equals" },
+    { value: "neq", label: "≠ not equals" },
+    { value: "gt", label: "> greater than" },
+    { value: "gte", label: "≥ greater than or equal" },
+    { value: "lt", label: "< less than" },
+    { value: "lte", label: "≤ less than or equal" },
     { value: "between", label: "↔ between" },
   ],
   enum: [
-    { value: "eq",      label: "= equals" },
-    { value: "neq",     label: "≠ not equals" },
-    { value: "in",      label: "∈ is one of" },
-    { value: "not_in",  label: "∉ is not one of" },
+    { value: "eq", label: "= equals" },
+    { value: "neq", label: "≠ not equals" },
+    { value: "in", label: "∈ is one of" },
+    { value: "not_in", label: "∉ is not one of" },
   ],
   text: [
-    { value: "eq",       label: "= equals" },
-    { value: "neq",      label: "≠ not equals" },
+    { value: "eq", label: "= equals" },
+    { value: "neq", label: "≠ not equals" },
     { value: "contains", label: "⊃ contains" },
   ],
 };
@@ -71,11 +79,16 @@ const OPERATORS: Record<AttrKind, { value: EdgeOperator; label: string }[]> = {
 // Default operator when switching attribute kinds
 const DEFAULT_OP: Record<AttrKind, EdgeOperator> = {
   numeric: "eq",
-  enum:    "eq",
-  text:    "eq",
+  enum: "eq",
+  text: "eq",
 };
 
 const attributeOptions = Object.values(AttributeKey).map((v) => ({
+  value: v,
+  label: v.replace(/_/g, " "),
+}));
+
+const valueKindOptions = Object.values(ValueKind).map((v) => ({
   value: v,
   label: v.replace(/_/g, " "),
 }));
@@ -134,13 +147,23 @@ function QuestionProperties({ node }: { node: Node<DagNodeData> }) {
           }
           placeholder="Enter your question"
         />
-        <Select
+        <Input
           label="Attribute to save"
           value={data.attribute}
-          options={attributeOptions}
           onChange={(e) =>
             updateNodeData(node.id, {
               attribute: e.target.value as AttributeKey,
+            } as Partial<DagNodeData>)
+          }
+          placeholder="Enter Attribute Key"
+        />
+        <Select
+          label="Value type"
+          value={data.valueKind}
+          options={valueKindOptions}
+          onChange={(e) =>
+            updateNodeData(node.id, {
+              valueKind: e.target.value as ValueKind,
             } as Partial<DagNodeData>)
           }
         />
@@ -184,30 +207,33 @@ function QuestionProperties({ node }: { node: Node<DagNodeData> }) {
       {data.answerType !== AnswerType.Slider && (
         <FieldGroup>
           <GroupLabel>Answer Options</GroupLabel>
-          {data.options && data.options.map((opt) => (
-            <OptionRow key={opt.id}>
-              <Input
-                value={opt.label}
-                onChange={(e) => updateOption(opt.id, "label", e.target.value)}
-                placeholder="Option label"
-                error={
-                  opt.label.trim() === ""
-                    ? "Label cannot be empty"
-                    : opt.label.length > 100
-                      ? "Label is too long"
-                      : undefined
-                }
-              />
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => removeOption(opt.id)}
-                style={{ flexShrink: 0 }}
-              >
-                <Trash2 size={14} />
-              </Button>
-            </OptionRow>
-          ))}
+          {data.options &&
+            data.options.map((opt) => (
+              <OptionRow key={opt.id}>
+                <Input
+                  value={opt.label}
+                  onChange={(e) =>
+                    updateOption(opt.id, "label", e.target.value)
+                  }
+                  placeholder="Option label"
+                  error={
+                    opt.label.trim() === ""
+                      ? "Label cannot be empty"
+                      : opt.label.length > 100
+                        ? "Label is too long"
+                        : undefined
+                  }
+                />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => removeOption(opt.id)}
+                  style={{ flexShrink: 0 }}
+                >
+                  <Trash2 size={14} />
+                </Button>
+              </OptionRow>
+            ))}
           <Button
             variant="secondary"
             size="sm"
@@ -361,7 +387,14 @@ const DEFAULT_CONDITIONS: EdgeConditions = {
   priority: 0,
 };
 
-function EdgeProperties({ edge }: { edge: Edge }) {
+
+function EdgeProperties({
+  edge,
+  attributeKeys,
+}: {
+  edge: Edge;
+  attributeKeys: AttributeKeyOption[];
+}) {
   const updateEdgeCondition = useDagStore((s) => s.updateEdgeCondition);
   const nodes = useDagStore((s) => s.nodes);
 
@@ -371,7 +404,8 @@ function EdgeProperties({ edge }: { edge: Edge }) {
     const map: Record<string, AttrMeta> = {};
     for (const n of nodes) {
       if (n.type === NodeType.Question) {
-        const qData = n.data as import("@shared/types/dag.types").QuestionNodeData;
+        const qData =
+          n.data as import("@shared/types/dag.types").QuestionNodeData;
         const isNumeric =
           qData.answerType === AnswerType.Slider ||
           NUMERIC_ATTRIBUTES.has(qData.attribute);
@@ -392,7 +426,8 @@ function EdgeProperties({ edge }: { edge: Edge }) {
     return "text";
   };
 
-  const conditions: EdgeConditions = edge.data?.conditions ?? DEFAULT_CONDITIONS;
+  const conditions: EdgeConditions =
+    edge.data?.conditions ?? DEFAULT_CONDITIONS;
 
   const update = (patch: Partial<EdgeConditions>) => {
     updateEdgeCondition(edge.id, { ...conditions, ...patch });
@@ -419,7 +454,9 @@ function EdgeProperties({ edge }: { edge: Edge }) {
 
   const patchRule = (idx: number, patch: Partial<EdgeConditionRule>) =>
     update({
-      rules: conditions.rules.map((r, i) => (i === idx ? { ...r, ...patch } : r)),
+      rules: conditions.rules.map((r, i) =>
+        i === idx ? { ...r, ...patch } : r,
+      ),
     });
 
   // When attribute changes: reset operator to kind-appropriate default and reset value
@@ -442,7 +479,7 @@ function EdgeProperties({ edge }: { edge: Edge }) {
     const isMulti = newOp === "in" || newOp === "not_in";
     patchRule(idx, {
       operator: newOp,
-      valueTo: newOp === "between" ? rule.valueTo ?? "" : undefined,
+      valueTo: newOp === "between" ? (rule.valueTo ?? "") : undefined,
       // reset value when switching between single↔multi-value modes
       value: wasMulti !== isMulti ? "" : rule.value,
     });
@@ -456,6 +493,22 @@ function EdgeProperties({ edge }: { edge: Edge }) {
       ? current.filter((v) => v !== optValue)
       : [...current, optValue];
     patchRule(idx, { value: next.join(",") });
+  };
+
+  const renderAttributes = () => {
+    return attributeKeys.map((attr) => ({
+      value: attr.key,
+      label: attr.key.replace(/_/g, " "),
+    }));
+  };
+
+
+  const findAllowedOperators = (
+    attrKey: string,
+  ): { value: string; label: string }[] => {
+    const kind = getKind(attrKey);
+
+    return OPERATORS[kind] || [];
   };
 
   return (
@@ -479,7 +532,11 @@ function EdgeProperties({ edge }: { edge: Edge }) {
           title="Toggle unconditional routing"
         >
           <ToggleIcon>
-            {conditions.always ? <Infinity size={14} /> : <GitBranch size={14} />}
+            {conditions.always ? (
+              <Infinity size={14} />
+            ) : (
+              <GitBranch size={14} />
+            )}
           </ToggleIcon>
           <ToggleLabel>
             {conditions.always
@@ -523,7 +580,7 @@ function EdgeProperties({ edge }: { edge: Edge }) {
                   <Select
                     label="Attribute"
                     value={rule.attributeKey}
-                    options={attributeOptions}
+                    options={renderAttributes()}
                     onChange={(e) => changeAttribute(idx, e.target.value)}
                   />
                   <DeleteRuleBtn
@@ -540,8 +597,10 @@ function EdgeProperties({ edge }: { edge: Edge }) {
                 <Select
                   label="Operator"
                   value={rule.operator}
-                  options={operatorList}
-                  onChange={(e) => changeOperator(idx, e.target.value as EdgeOperator)}
+                  options={findAllowedOperators(rule.attributeKey)}
+                  onChange={(e) =>
+                    changeOperator(idx, e.target.value as EdgeOperator)
+                  }
                 />
 
                 {/* Value input — varies by operator + kind */}
@@ -553,7 +612,9 @@ function EdgeProperties({ edge }: { edge: Edge }) {
                       label="From"
                       type="number"
                       value={rule.value}
-                      onChange={(e) => patchRule(idx, { value: e.target.value })}
+                      onChange={(e) =>
+                        patchRule(idx, { value: e.target.value })
+                      }
                       placeholder="min"
                     />
                     <BetweenSep>–</BetweenSep>
@@ -561,7 +622,9 @@ function EdgeProperties({ edge }: { edge: Edge }) {
                       label="To"
                       type="number"
                       value={rule.valueTo ?? ""}
-                      onChange={(e) => patchRule(idx, { valueTo: e.target.value })}
+                      onChange={(e) =>
+                        patchRule(idx, { valueTo: e.target.value })
+                      }
                       placeholder="max"
                     />
                   </BetweenRow>
@@ -594,7 +657,9 @@ function EdgeProperties({ edge }: { edge: Edge }) {
                     <Input
                       label="Values (comma-separated)"
                       value={rule.value}
-                      onChange={(e) => patchRule(idx, { value: e.target.value })}
+                      onChange={(e) =>
+                        patchRule(idx, { value: e.target.value })
+                      }
                       placeholder="val1,val2,val3"
                     />
                   )}
@@ -612,7 +677,9 @@ function EdgeProperties({ edge }: { edge: Edge }) {
                         value: o.value,
                         label: o.label,
                       }))}
-                      onChange={(e) => patchRule(idx, { value: e.target.value })}
+                      onChange={(e) =>
+                        patchRule(idx, { value: e.target.value })
+                      }
                     />
                   )}
 
@@ -625,7 +692,9 @@ function EdgeProperties({ edge }: { edge: Edge }) {
                       label="Value"
                       type="number"
                       value={rule.value}
-                      onChange={(e) => patchRule(idx, { value: e.target.value })}
+                      onChange={(e) =>
+                        patchRule(idx, { value: e.target.value })
+                      }
                       placeholder="0"
                     />
                   )}
@@ -638,7 +707,9 @@ function EdgeProperties({ edge }: { edge: Edge }) {
                     <Input
                       label="Value"
                       value={rule.value}
-                      onChange={(e) => patchRule(idx, { value: e.target.value })}
+                      onChange={(e) =>
+                        patchRule(idx, { value: e.target.value })
+                      }
                       placeholder="exact match value"
                     />
                   )}
@@ -709,7 +780,11 @@ function EntryNodeSection({ nodeId }: { nodeId: string }) {
   );
 }
 
-export function PropertiesPanel() {
+export function PropertiesPanel({
+  attributeKeys,
+}: {
+  attributeKeys: AttributeKeyOption[];
+}) {
   const selectedNode = useDagStore(selectSelectedNode);
   const selectedEdge = useDagStore(selectSelectedEdge);
   const setSelectedNode = useDagStore((s) => s.setSelectedNode);
@@ -745,9 +820,7 @@ export function PropertiesPanel() {
           </PanelHeader>
 
           <PanelBody>
-            {selectedNode && (
-              <EntryNodeSection nodeId={selectedNode.id} />
-            )}
+            {selectedNode && <EntryNodeSection nodeId={selectedNode.id} />}
             {selectedNode && selectedNode.type === NodeType.Question && (
               <QuestionProperties node={selectedNode} />
             )}
@@ -757,7 +830,12 @@ export function PropertiesPanel() {
             {selectedNode && selectedNode.type === NodeType.Offer && (
               <OfferProperties node={selectedNode} />
             )}
-            {selectedEdge && <EdgeProperties edge={selectedEdge} />}
+            {selectedEdge && (
+              <EdgeProperties
+                edge={selectedEdge}
+                attributeKeys={attributeKeys}
+              />
+            )}
           </PanelBody>
         </Panel>
       )}

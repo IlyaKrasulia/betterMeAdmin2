@@ -20,10 +20,22 @@ export enum AttributeKey {
   EnergyLevel = 'energy_level',
 }
 
+export enum ValueKind {
+  Text = 'Text',
+  Number = 'Numeric',
+}
+
 export enum AnswerType {
   SingleChoice = 'SingleChoice',
   MultipleChoice = 'MultipleChoice',
   Slider = 'Slider',
+}
+
+
+export interface AttributeKeyOption {
+  value: string;
+  label: string;
+  key: AttributeKey;
 }
 
 export interface AnswerOption {
@@ -41,6 +53,7 @@ export interface QuestionNodeData {
   attribute: AttributeKey
   answerType: AnswerType
   options: AnswerOption[]
+  valueKind?: ValueKind // used for dynamic form generation; matches one of the ValueKind values
   /** Slider lower bound (only used when answerType is Slider) */
   min?: number
   /** Slider upper bound (only used when answerType is Slider) */

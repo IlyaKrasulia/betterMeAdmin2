@@ -24,8 +24,11 @@ import type {
   QuestionNodeData,
   InfoNodeData,
   OfferNodeData,
+  AttributeKeyOption,
 } from "@shared/types/dag.types";
 import { AttributeKey, AnswerType } from "@shared/types/dag.types";
+import { useParams } from "@tanstack/react-router";
+import { useFlow } from "@/features/flows/hooks/useFlows";
 
 // ─── Type registries — MUST be defined outside the component ─────────────────
 const nodeTypes = {
@@ -77,6 +80,8 @@ export function DagCanvas() {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const { screenToFlowPosition, fitView } = useReactFlow();
   const hasFittedRef = useRef(false);
+  const { surveyId } = useParams({ from: "/editor/$surveyId" });
+  const { data: flow } = useFlow(surveyId);
 
   const nodes = useDagStore((s) => s.nodes);
   const edges = useDagStore((s) => s.edges);
@@ -163,9 +168,6 @@ export function DagCanvas() {
     [theme],
   );
 
-  console.log(edges);
-  
-
   return (
     <EditorLayout>
       <NodePalette onDragStart={onDragStart} />
@@ -248,7 +250,7 @@ export function DagCanvas() {
         </ReactFlow>
       </CanvasWrapper>
 
-      <PropertiesPanel />
+      <PropertiesPanel attributeKeys={flow?.attributeKeys as AttributeKeyOption[]} />
     </EditorLayout>
   );
 }

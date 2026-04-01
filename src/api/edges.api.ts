@@ -17,7 +17,7 @@ export const edgesApi = {
   updateEdge: async (
     flowId: string,
     edgeId: string,
-    data: UpdateEdgeRequest
+    data: UpdateEdgeRequest,
   ): Promise<EdgeDetail> => {
     const response = await apiClient.put<EdgeDetail>(
       `/api/admin/flows/${flowId}/edges/${edgeId}`,

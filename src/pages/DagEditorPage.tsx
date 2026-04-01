@@ -127,25 +127,32 @@ export function DagEditorPage() {
       priority: 0,
     };
 
-  // Serialize edge conditions to the JSON string the backend expects.
-  // Canonical format: null (always) | [{ AttributeKey, Operator, Value, ValueTo? }, ...]
-  const toConditionsJson = (edge: Edge): string | null => {
+  const toConditionsJson = (
+    edge: Edge,
+    operator: "AND" | "OR",
+  ): string | null => {
     const cond = getEdgeConditions(edge);
+
     if (cond.always || cond.rules.length === 0) return null;
-    return JSON.stringify(
-      cond.rules.map((r) => {
-        const base = {
+
+    const formattedData = {
+      operator: operator,
+      rules: cond.rules.map((r) => {
+        const base: any = {
           AttributeKey: r.attributeKey,
           Operator: r.operator ?? "eq",
           Value: r.value,
         };
-        // Include ValueTo only for the 'between' operator
+
         if (r.operator === "between" && r.valueTo !== undefined) {
-          return { ...base, ValueTo: r.valueTo };
+          base.ValueTo = r.valueTo;
         }
+
         return base;
       }),
-    );
+    };
+
+    return JSON.stringify(formattedData, null, 2);
   };
 
   // Detect whether an existing edge's conditions OR priority have changed
@@ -232,8 +239,6 @@ export function DagEditorPage() {
       // Map client-generated IDs to server-assigned IDs for newly created nodes
       const clientToServerId = new Map<string, string>();
 
-      console.log(originalEdgeMap, " => original edges");
-
       // ── 1. Create new nodes ────────────────────────────────────────────
       for (const node of nodes) {
         if (!originalNodeMap.has(node.id)) {
@@ -255,7 +260,7 @@ export function DagEditorPage() {
             }
           }
         }
-      }
+      }      
 
       // ── 2. Update existing nodes (content only) ────────────────────────
       await Promise.all(
@@ -359,7 +364,7 @@ export function DagEditorPage() {
                 sourceNodeId: resolveNodeId(edge.source),
                 targetNodeId: resolveNodeId(edge.target),
                 priority: getEdgeConditions(edge).priority,
-                conditions: toConditionsJson(edge),
+                conditionsJson: toConditionsJson(edge, "OR"),
               },
             });
           }),
@@ -372,27 +377,13 @@ export function DagEditorPage() {
           .flatMap((edge) => {
             const orig = originalEdgeMap.get(edge.id)!;
             if (edgeConditionChanged(edge, orig)) {
-              console.log(
-                {
-                  flowId: surveyId,
-                  edgeId: edge.id,
-                  data: {
-                    operator: "or",
-                    priority: getEdgeConditions(edge).priority,
-                    rules: JSON.parse(toConditionsJson(edge) ?? "null"),
-                  },
-                },
-                " => updateEdge payload",
-              );
-
               return [
                 updateEdge({
                   flowId: surveyId,
                   edgeId: edge.id,
                   data: {
-                    operator: "or",
                     priority: getEdgeConditions(edge).priority,
-                    conditions: toConditionsJson(edge),
+                    conditionsJson: toConditionsJson(edge, "OR"),
                   },
                 }),
               ];

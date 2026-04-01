@@ -1,6 +1,6 @@
 // ─── Common ───────────────────────────────────────────────────────────────────
 
-import { AnswerType } from "./dag.types";
+import { AnswerType, AttributeKeyOption, ValueKind } from "./dag.types";
 
 export interface MessageResponse {
   message: string;
@@ -84,6 +84,7 @@ export interface FlowNodeDto {
   answerType: AnswerType;
   sliderMin?: number;
   sliderMax?: number;
+  valueKind?: ValueKind;
 }
 
 export interface FlowEdgeDto {
@@ -97,6 +98,7 @@ export interface FlowEdgeDto {
 export interface FlowDetail extends FlowSummary {
   nodes: FlowNodeDto[];
   edges: FlowEdgeDto[];
+  attributeKeys: AttributeKeyOption[];
 }
 
 // Requests
@@ -163,6 +165,7 @@ export interface CreateNodeRequest {
   positionY?: number;
   offer?: InlineOfferRequest;
   answerType?: AnswerType;
+  valueKind?: ValueKind;
 }
 
 export interface UpdateInlineOfferRequest {
@@ -187,6 +190,7 @@ export interface UpdateNodeRequest {
   answerType?: AnswerType;
   SliderMin?: number;
   SliderMax?: number;
+  valueKind?: ValueKind;
 }
 
 export interface UpdateNodePositionRequest {
@@ -246,12 +250,12 @@ export interface CreateEdgeRequest {
   sourceNodeId: string;
   targetNodeId: string;
   priority?: number;
-  conditions?: string | null;
+  conditionsJson?: string | null;
 }
 
 export interface UpdateEdgeRequest {
   priority?: number;
-  conditions?: string | null;
+  conditionsJson?: string | null;
 }
 
 // ─── Admin — Offers ───────────────────────────────────────────────────────────

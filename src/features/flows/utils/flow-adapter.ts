@@ -42,7 +42,6 @@ function apiTypeToNodeType(apiType: string): NodeType {
  */
 export function flowNodeToNode(dto: FlowNodeDto): Node<DagNodeData> {
   const nodeType = apiTypeToNodeType(dto.type);
-
   let data: DagNodeData;
   switch (dto.type) {
     case "Question": {
@@ -56,6 +55,7 @@ export function flowNodeToNode(dto: FlowNodeDto): Node<DagNodeData> {
           label: o.label,
           value: o.value,
         })),
+        valueKind: dto.valueKind,
         max: dto.answerType === AnswerType.Slider ? dto.sliderMax : undefined,
         min: dto.answerType === AnswerType.Slider ? dto.sliderMin : undefined,
       };
@@ -116,21 +116,24 @@ export function flowNodeToNode(dto: FlowNodeDto): Node<DagNodeData> {
  */
 export function flowEdgeToEdge(dto: FlowEdgeDto): Edge {
   const priority = dto.priority ?? 0;
-  let conditions: EdgeConditions = { always: true, rules: [], priority };
+
+  const conditionJson = dto?.conditions as string ?? null;
+  let conditions: EdgeConditions = conditionJson ? JSON.parse(conditionJson) : { always: true, rules: [], priority };
 
   if (dto.conditions) {
     try {
-      const parsed = JSON.parse(dto.conditions) as unknown;
+      const parsed = JSON.parse(dto.conditions) as { rules?: unknown };
 
-      if (Array.isArray(parsed) && parsed.length > 0) {
+      if (parsed) {
         // Canonical backend format: [{ AttributeKey, Operator?, Value, ValueTo? }]
         type BackendRule = {
           AttributeKey?: string;
           Operator?: string;
           Value?: string;
           ValueTo?: string;
+          rules?: unknown;
         };
-        const rules = (parsed as BackendRule[])
+        const rules = (parsed.rules as BackendRule[])
           .filter((r) => r.AttributeKey)
           .map((r) => ({
             attributeKey: r.AttributeKey!,
@@ -138,6 +141,7 @@ export function flowEdgeToEdge(dto: FlowEdgeDto): Edge {
             value: r.Value ?? "",
             ...(r.ValueTo !== undefined ? { valueTo: r.ValueTo } : {}),
           }));
+
         if (rules.length > 0) {
           conditions = { always: false, rules, priority };
         }
@@ -146,17 +150,18 @@ export function flowEdgeToEdge(dto: FlowEdgeDto): Edge {
         typeof parsed === "object" &&
         !Array.isArray(parsed)
       ) {
-        // Legacy format: { operator: "AND", rules: [{ attribute, op, value }] }
         const legacy = parsed as {
-          rules?: Array<{ attribute?: string; op?: string; value?: string }>;
+          rules?: Array<{ rules: { AttributeKey?: string; Operator?: string; Value?: string; ValueTo?: string } }>;
         };
         const rules = (legacy.rules ?? [])
-          .filter((r) => r.attribute)
+          .filter((r) => r.rules.AttributeKey)
           .map((r) => ({
-            attributeKey: r.attribute!,
-            operator: (r.op ?? "eq") as EdgeOperator,
-            value: r.value ?? "",
+            attributeKey: r.rules.AttributeKey!,
+            operator: (r.rules.Operator ?? "eq") as EdgeOperator,
+            value: r.rules.Value ?? "",
           }));
+
+
         if (rules.length > 0) {
           conditions = { always: false, rules, priority };
         }
@@ -236,6 +241,7 @@ export function nodeToCreateRequest(
         attributeKey: data.attribute,
         description: '',
         answerType: data.answerType,
+        valueKind: data.valueKind,
         ...slider,
       };
     }
@@ -288,6 +294,7 @@ export function nodeToUpdateRequest(
         attributeKey: data.attribute,
         description: '',
         answerType: data.answerType,
+        valueKind: data.valueKind,
         ...slider,
       };
     }
