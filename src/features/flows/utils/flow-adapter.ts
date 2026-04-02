@@ -12,7 +12,7 @@ import type {
   UpdateNodeRequest,
   AdminFlowNodeType,
 } from "@shared/types/api.types";
-import { NodeType, AttributeKey, AnswerType } from "@shared/types/dag.types";
+import { NodeType, AttributeKey, AnswerType, ValueKind } from "@shared/types/dag.types";
 import type {
   DagNodeData,
   QuestionNodeData,
@@ -42,6 +42,7 @@ function apiTypeToNodeType(apiType: string): NodeType {
  */
 export function flowNodeToNode(dto: FlowNodeDto): Node<DagNodeData> {
   const nodeType = apiTypeToNodeType(dto.type);
+
   let data: DagNodeData;
   switch (dto.type) {
     case "Question": {
@@ -241,7 +242,7 @@ export function nodeToCreateRequest(
         attributeKey: data.attribute,
         description: '',
         answerType: data.answerType,
-        valueKind: data.valueKind,
+        valueKind: data.valueKind || ValueKind.Text,
         ...slider,
       };
     }
@@ -294,7 +295,7 @@ export function nodeToUpdateRequest(
         attributeKey: data.attribute,
         description: '',
         answerType: data.answerType,
-        valueKind: data.valueKind,
+        valueKind: data.valueKind || ValueKind.Text,
         ...slider,
       };
     }

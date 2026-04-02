@@ -16,7 +16,10 @@ interface QuestionStepProps {
 export function QuestionStep({ data, onAnswer }: QuestionStepProps) {
   const [selected, setSelected] = useState<string[]>([])
 
-  const { questionText, answerType, options, mediaUrl } = data
+  const { questionText, answerType, options, mediaUrl } = data  
+
+  // console.log(data, ' => data');
+  
 
   // Slider: discrete (has options) vs numeric (empty options, uses min/max)
   const isNumericSlider = answerType === AnswerType.Slider && (!options || options.length === 0)

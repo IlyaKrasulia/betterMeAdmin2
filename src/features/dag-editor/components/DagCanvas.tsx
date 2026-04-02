@@ -18,7 +18,7 @@ import { QuestionNode } from "./nodes/QuestionNode";
 import { InfoNode } from "./nodes/InfoNode";
 import { OfferNode } from "./nodes/OfferNode";
 import { ConditionEdge } from "./ConditionEdge";
-import { NodeType } from "@shared/types/dag.types";
+import { NodeType, ValueKind } from "@shared/types/dag.types";
 import type {
   DagNodeData,
   QuestionNodeData,
@@ -137,6 +137,7 @@ export function DagCanvas() {
         type,
         position,
         data: createNodeData(type, AnswerType.SingleChoice),
+        isLocal: true,
       };
 
       addNode(newNode);
