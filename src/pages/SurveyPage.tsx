@@ -31,8 +31,8 @@ const cardVariants = {
 function sessionNodeToQuestion(node: SessionCurrentNode): QuestionNodeData & { mediaUrl?: string | null } {
   // answerType may come as a top-level field OR embedded in description JSON
   let answerType: AnswerType = node.answerType ?? AnswerType.SingleChoice
-  let min: number | undefined
-  let max: number | undefined
+  let min: number | undefined = node.sliderMin
+  let max: number | undefined = node.sliderMax
 
   if (!node.answerType && node.description) {
     try {

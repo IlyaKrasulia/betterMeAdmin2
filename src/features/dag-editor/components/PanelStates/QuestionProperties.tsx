@@ -105,6 +105,7 @@ export function QuestionProperties({ node }: { node: Node<DagNodeData> }) {
           onChange={(e) =>
             updateNodeData(node.id, {
               answerType: e.target.value as AnswerType,
+              options: e.target.value === AnswerType.Slider ? [] : data.options,
             } as Partial<DagNodeData>)
           }
         />

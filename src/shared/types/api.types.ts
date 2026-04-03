@@ -425,6 +425,9 @@ export interface SessionCurrentNode {
   options: ContentOptionDto[];
   offers: SessionNodeOffer[];
   answerType?: AnswerType;
+  sliderMin?: number;
+  sliderMax?: number;
+  valueKind?: ValueKind;
 }
 
 /** Unified session response shape returned by start, answer, back, and get endpoints */
