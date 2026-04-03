@@ -1,5 +1,6 @@
+import { useState } from "react";
 import styled from "styled-components";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Edit2,
   Trash2,
@@ -9,6 +10,8 @@ import {
   Circle,
   Globe,
   GlobeLock,
+  BarChart3,
+  AlertTriangle,
 } from "lucide-react";
 import { Badge } from "@shared/ui/Badge";
 import { Button } from "@shared/ui/Button";
@@ -22,6 +25,7 @@ interface SurveyCardProps {
   onCopyLink: (id: string) => void;
   onPublish?: (id: string) => void;
   onUnpublish?: (id: string) => void;
+  onStats: (id: string) => void;
   index: number;
 }
 
@@ -32,8 +36,11 @@ export function SurveyCard({
   onCopyLink,
   onPublish,
   onUnpublish,
+  onStats,
   index,
 }: SurveyCardProps) {
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
   return (
     <Card
       initial={{ opacity: 0, y: 16 }}
@@ -61,64 +68,84 @@ export function SurveyCard({
       </Meta>
 
       <Actions>
-        <Button
-          variant="ghost"
-          size="sm"
-          icon={<Edit2 size={14} />}
-          onClick={() => onEdit(flow.id)}
-        >
-          Edit
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          icon={<Copy size={14} />}
-          onClick={() => onCopyLink(flow.id)}
-        >
-          Copy Link
-        </Button>
+        <IconBtn title="Edit" onClick={() => onEdit(flow.id)}>
+          <Edit2 size={15} />
+        </IconBtn>
+        <IconBtn title="Stats" onClick={() => onStats(flow.id)}>
+          <BarChart3 size={15} />
+        </IconBtn>
+        <IconBtn title="Copy Link" onClick={() => onCopyLink(flow.id)}>
+          <Copy size={15} />
+        </IconBtn>
         {flow.isPublished ? (
-          <Button
-            variant="ghost"
-            size="sm"
-            icon={<GlobeLock size={14} />}
-            onClick={() => onUnpublish?.(flow.id)}
-          >
-            Unpublish
-          </Button>
+          <IconBtn title="Unpublish" onClick={() => onUnpublish?.(flow.id)}>
+            <GlobeLock size={15} />
+          </IconBtn>
         ) : (
-          <Button
-            variant="ghost"
-            size="sm"
-            icon={<Globe size={14} />}
-            onClick={() => onPublish?.(flow.id)}
-          >
-            Publish
-          </Button>
+          <IconBtn title="Publish" onClick={() => onPublish?.(flow.id)}>
+            <Globe size={15} />
+          </IconBtn>
         )}
         <Spacer />
-        <Button
-          variant="ghost"
-          size="sm"
-          icon={<Trash2 size={14} />}
-          onClick={() => onDelete(flow.id)}
-          style={{ color: "#EF4444" }}
-        >
-          Delete
-        </Button>
+        <DeleteButton title="Delete" onClick={() => setConfirmDelete(true)}>
+          <Trash2 size={15} />
+        </DeleteButton>
       </Actions>
+
+      <AnimatePresence>
+        {confirmDelete && (
+          <ConfirmOverlay
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.15 }}
+          >
+            <ConfirmContent
+              initial={{ scale: 0.95 }}
+              animate={{ scale: 1 }}
+              exit={{ scale: 0.95 }}
+              transition={{ duration: 0.15 }}
+            >
+              <ConfirmTitle>
+                <AlertTriangle size={16} color="currentColor" />
+                Delete "{flow.name}"?
+              </ConfirmTitle>
+              <ConfirmActions>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setConfirmDelete(false)}
+                >
+                  Cancel
+                </Button>
+                <DeleteConfirmBtn
+                  onClick={() => {
+                    setConfirmDelete(false);
+                    onDelete(flow.id);
+                  }}
+                >
+                  <Trash2 size={14} />
+                  Delete
+                </DeleteConfirmBtn>
+              </ConfirmActions>
+            </ConfirmContent>
+          </ConfirmOverlay>
+        )}
+      </AnimatePresence>
     </Card>
   );
 }
 
 const Card = styled(motion.article)`
+  position: relative;
   background: ${({ theme }) => theme.colors.bgSurface};
   border: 1px solid ${({ theme }) => theme.colors.border};
   border-radius: ${({ theme }) => theme.radii.lg};
-  padding: 20px;
+  padding: 16px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 10px;
+  overflow: hidden;
   transition:
     border-color ${({ theme }) => theme.transitions.fast},
     box-shadow ${({ theme }) => theme.transitions.fast};
@@ -182,11 +209,116 @@ const MetaItem = styled.div`
 const Actions = styled.div`
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 4px;
-  padding-top: 12px;
+  padding-top: 10px;
+  margin-top: auto;
   border-top: 1px solid ${({ theme }) => theme.colors.border};
 `;
 
 const Spacer = styled.div`
   flex: 1;
+`;
+
+const IconBtn = styled.button`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: ${({ theme }) => theme.radii.md};
+  border: none;
+  background: transparent;
+  color: ${({ theme }) => theme.colors.textSecondary};
+  cursor: pointer;
+  flex-shrink: 0;
+  transition:
+    background ${({ theme }) => theme.transitions.fast},
+    color ${({ theme }) => theme.transitions.fast};
+
+  &:hover {
+    background: ${({ theme }) => theme.colors.bgElevated};
+    color: ${({ theme }) => theme.colors.textPrimary};
+  }
+`;
+
+const DeleteButton = styled.button`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: ${({ theme }) => theme.radii.md};
+  border: none;
+  background: transparent;
+  color: ${({ theme }) => theme.colors.textTertiary};
+  cursor: pointer;
+  flex-shrink: 0;
+  transition:
+    background ${({ theme }) => theme.transitions.fast},
+    color ${({ theme }) => theme.transitions.fast};
+
+  &:hover {
+    background: ${({ theme }) => theme.colors.errorLight};
+    color: ${({ theme }) => theme.colors.error};
+  }
+`;
+
+/* ─── Delete Confirmation Overlay ──────────────────────────────────── */
+
+const ConfirmOverlay = styled(motion.div)`
+  position: absolute;
+  inset: 0;
+  background: ${({ theme }) => theme.colors.bgSurface}ee;
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10;
+  border-radius: ${({ theme }) => theme.radii.lg};
+`;
+
+const ConfirmContent = styled(motion.div)`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 10px;
+`;
+
+const ConfirmTitle = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: ${({ theme }) => theme.typography.sizes.sm};
+  font-weight: ${({ theme }) => theme.typography.weights.semibold};
+  color: ${({ theme }) => theme.colors.error};
+`;
+
+const ConfirmActions = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+`;
+
+const DeleteConfirmBtn = styled.button`
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: ${({ theme }) => theme.radii.md};
+  border: none;
+  background: ${({ theme }) => theme.colors.error};
+  color: #fff;
+  font-size: ${({ theme }) => theme.typography.sizes.sm};
+  font-weight: ${({ theme }) => theme.typography.weights.medium};
+  cursor: pointer;
+  transition:
+    background ${({ theme }) => theme.transitions.fast},
+    transform ${({ theme }) => theme.transitions.fast};
+
+  &:hover {
+    background: ${({ theme }) => theme.colors.error}dd;
+    transform: scale(1.02);
+  }
 `;

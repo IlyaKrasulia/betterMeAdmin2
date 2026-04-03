@@ -70,6 +70,14 @@ export interface EdgeConditions {
   rules: ConditionRule[];
 }
 
+export interface FlowNodeStatsDto {
+  answerCount: number;
+  droppedOffCount: number;
+  offerImpressions: number;
+  offerConversions: number;
+  offerConversionRate: number;
+}
+
 export interface FlowNodeDto {
   id: string;
   type: AdminFlowNodeType;
@@ -85,6 +93,7 @@ export interface FlowNodeDto {
   sliderMin?: number;
   sliderMax?: number;
   valueKind?: ValueKind;
+  stats?: FlowNodeStatsDto;
 }
 
 export interface FlowEdgeDto {
@@ -95,10 +104,29 @@ export interface FlowEdgeDto {
   conditions: string | null; // JSON string from GET /flows/{id}
 }
 
+export interface FlowStatsDto {
+  nodeCount: number;
+  edgeCount: number;
+  questionCount: number;
+  offerNodeCount: number;
+  infoPageCount: number;
+  totalSessions: number;
+  completedSessions: number;
+  abandonedSessions: number;
+  inProgressSessions: number;
+  completionRate: number;
+  abandonRate: number;
+  lastSessionAt: string | null;
+  totalOfferImpressions: number;
+  totalOfferConversions: number;
+  offerConversionRate: number;
+}
+
 export interface FlowDetail extends FlowSummary {
   nodes: FlowNodeDto[];
   edges: FlowEdgeDto[];
   attributeKeys: AttributeKeyOption[];
+  stats?: FlowStatsDto;
 }
 
 // Requests
@@ -467,6 +495,43 @@ export interface DropOffDto {
   nodeTitle: string;
   dropOffCount: number;
   dropOffRate: number;
+}
+
+// ─── Admin — Analytics (actual API responses) ────────────────────────────────
+
+export interface GlobalSessionStatsResponse {
+  totalSessions: number;
+  inProgress: number;
+  completed: number;
+  abandoned: number;
+  completionRate: number;
+  abandonRate: number;
+}
+
+export interface GlobalOfferStatsItem {
+  offerId: string;
+  offerName: string;
+  offerSlug: string;
+  timesPresented: number;
+  timesConverted: number;
+  conversionRate: number;
+}
+
+export interface GlobalOfferStatsResponse {
+  items: GlobalOfferStatsItem[];
+}
+
+export interface GlobalDropOffItem {
+  nodeId: string;
+  nodeTitle: string;
+  flowId: string;
+  flowTitle: string;
+  sessionCount: number;
+  dropOffRate: number;
+}
+
+export interface GlobalDropOffResponse {
+  items: GlobalDropOffItem[];
 }
 
 // Query params

@@ -11,6 +11,7 @@ import { LoginPage } from '@pages/LoginPage'
 import { DashboardPage } from '@pages/DashboardPage'
 import { DagEditorPage } from '@pages/DagEditorPage'
 import { SurveyPage } from '@pages/SurveyPage'
+import { FlowStatsPage } from '@pages/FlowStatsPage'
 import { useAuthStore } from '@features/auth/store/auth.store'
 
 // ─── Root route ───────────────────────────────────────────────────────────────
@@ -100,6 +101,17 @@ const editorRoute = createRoute({
   ),
 })
 
+const statsRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/stats/$flowId',
+  beforeLoad: requireAuth,
+  component: () => (
+    <PageWrapper>
+      <FlowStatsPage />
+    </PageWrapper>
+  ),
+})
+
 // Public survey-taking route — no authentication required
 const surveyRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -117,6 +129,7 @@ const routeTree = rootRoute.addChildren([
   loginRoute,
   dashboardRoute,
   editorRoute,
+  statsRoute,
   surveyRoute,
 ])
 

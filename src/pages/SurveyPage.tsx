@@ -241,13 +241,16 @@ export function SurveyPage() {
   // ─── Offer accept ──────────────────────────────────────────────────────────
 
   const handleOfferAccept = useCallback(
-    async (offerId?: string) => {
+    async (offerId?: string, ctaUrl?: string) => {
       if (sessionId && offerId) {
         try {
           await recordConversion({ sessionId, data: { offerId } })
         } catch {
           // Non-fatal: complete even if conversion recording fails
         }
+      }
+      if (ctaUrl) {
+        window.open(ctaUrl, '_blank', 'noopener,noreferrer')
       }
       setPageState('completed')
     },
@@ -391,7 +394,7 @@ export function SurveyPage() {
                   data={sessionNodeToOffer(currentNode, currentNode.offers ?? [])}
                   onAccept={() => {
                     const primary = (currentNode.offers ?? []).find((o) => o.isPrimary) ?? (currentNode.offers ?? [])[0]
-                    handleOfferAccept(primary?.id)
+                    handleOfferAccept(primary?.id, primary?.ctaUrl ?? undefined)
                   }}
                 />
               )}
