@@ -3,6 +3,9 @@ import type {
   FlowSummary,
   FlowDetail,
   CreateFlowRequest,
+  GenerateFlowRequest,
+  GenerateFlowStartResponse,
+  GenerateFlowStatusResponse,
   UpdateFlowRequest,
   SetEntryNodeRequest,
   MessageResponse,
@@ -24,6 +27,20 @@ export const flowsApi = {
   // POST /api/admin/flows
   createFlow: async (data: CreateFlowRequest): Promise<FlowSummary> => {
     const response = await apiClient.post<FlowSummary>('/api/admin/flows', data)
+    return response.data
+  },
+
+  // POST /api/admin/flows/generate — starts async job
+  generateFlow: async (data: GenerateFlowRequest): Promise<GenerateFlowStartResponse> => {
+    const response = await apiClient.post<GenerateFlowStartResponse>('/api/admin/flows/generate', data)
+    return response.data
+  },
+
+  // GET /api/admin/flows/generate/status/{jobId} — poll job status
+  getGenerateStatus: async (jobId: string): Promise<GenerateFlowStatusResponse> => {
+    const response = await apiClient.get<GenerateFlowStatusResponse>(
+      `/api/admin/flows/generate/status/${jobId}`
+    )
     return response.data
   },
 

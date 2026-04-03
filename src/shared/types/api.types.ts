@@ -122,17 +122,51 @@ export interface FlowStatsDto {
   offerConversionRate: number;
 }
 
+export interface FlowPathNodeDto {
+  id: string;
+  type: string;
+  attributeKey: string;
+  valueKind: string | null;
+  title: string;
+  answerType: string | null;
+}
+
+export interface FlowPathDto {
+  path: string;
+  nodes: FlowPathNodeDto[];
+  count: number;
+  completed: number;
+  abandoned: number;
+  inProgress: number;
+}
+
 export interface FlowDetail extends FlowSummary {
   nodes: FlowNodeDto[];
   edges: FlowEdgeDto[];
   attributeKeys: AttributeKeyOption[];
   stats?: FlowStatsDto;
+  pathDistribution?: FlowPathDto[];
 }
 
 // Requests
 export interface CreateFlowRequest {
   name: string;
   description?: string;
+}
+
+export interface GenerateFlowRequest {
+  userPrompt: string;
+}
+
+export interface GenerateFlowStartResponse {
+  jobId: string;
+}
+
+export interface GenerateFlowStatusResponse {
+  jobId: string;
+  status: 'Pending' | 'Running' | 'Done' | 'Failed';
+  flowId: string | null;
+  error: string | null;
 }
 
 export interface UpdateFlowRequest {
