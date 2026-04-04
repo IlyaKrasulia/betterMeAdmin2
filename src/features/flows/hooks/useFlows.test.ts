@@ -60,7 +60,7 @@ describe('useFlows', () => {
 
 describe('useFlow', () => {
   it('fetches a single flow by id', async () => {
-    const detail = { ...flowSummary, nodes: [], edges: [] }
+    const detail = { ...flowSummary, nodes: [], edges: [], attributeKeys: [] }
     vi.mocked(flowsApi.getFlow).mockResolvedValueOnce(detail)
     const { result } = renderHook(() => useFlow('f1'), { wrapper: createWrapper() })
     await waitFor(() => expect(result.current.isSuccess).toBe(true))

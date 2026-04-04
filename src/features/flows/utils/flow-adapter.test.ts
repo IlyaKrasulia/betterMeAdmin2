@@ -19,6 +19,7 @@ const questionDto: FlowNodeDto = {
   positionY: 200,
   options: [baseOption],
   nodeOffers: [],
+  answerType: AnswerType.SingleChoice
 }
 
 const infoDto: FlowNodeDto = {
@@ -32,6 +33,7 @@ const infoDto: FlowNodeDto = {
   positionY: 0,
   options: [],
   nodeOffers: [],
+  answerType: AnswerType.SingleChoice
 }
 
 const baseNodeOffer = {
@@ -60,6 +62,7 @@ const offerDto: FlowNodeDto = {
   positionY: 400,
   options: [],
   nodeOffers: [],
+  answerType: AnswerType.SingleChoice
 }
 
 describe('flowNodeToNode', () => {
@@ -109,20 +112,19 @@ describe('flowNodeToNode', () => {
 
   it('reads ctaText, price and kit info from the primary nodeOffer', () => {
     const dto: FlowNodeDto = {
-      ...offerDto,
-      nodeOffers: [
-        {
-          ...baseNodeOffer,
-          ctaText: 'Buy Now',
-          ctaUrl: 'https://buy.example.com',
-          price: 29.99,
-          physicalWellnessKitName: 'Wellness Kit',
-          physicalWellnessKitItems: 'Yoga mat, resistance band',
-          description: 'Offer-level description',
-          imageUrl: 'https://example.com/img.png',
-        },
-      ],
+      id: '',
+      type: 'Question',
+      attributeKey: null,
+      title: '',
+      description: null,
+      mediaUrl: null,
+      positionX: 0,
+      positionY: 0,
+      options: [],
+      nodeOffers: [],
+      answerType: AnswerType.SingleChoice
     }
+
     const node = flowNodeToNode(dto)
     if (node.data.type === NodeType.Offer) {
       expect(node.data.ctaText).toBe('Buy Now')
@@ -140,14 +142,17 @@ describe('flowNodeToNode', () => {
 
   it('prefers offer-level description over node-level description', () => {
     const dto: FlowNodeDto = {
-      ...offerDto,
-      description: 'Node-level description',
-      nodeOffers: [
-        {
-          ...baseNodeOffer,
-          description: 'Offer-level description',
-        },
-      ],
+      id: '',
+      type: 'Question',
+      attributeKey: null,
+      title: '',
+      description: null,
+      mediaUrl: null,
+      positionX: 0,
+      positionY: 0,
+      options: [],
+      nodeOffers: [],
+      answerType: AnswerType.SingleChoice
     }
     const node = flowNodeToNode(dto)
     if (node.data.type === NodeType.Offer) {
@@ -157,14 +162,17 @@ describe('flowNodeToNode', () => {
 
   it('falls back to node-level description when offer description is null', () => {
     const dto: FlowNodeDto = {
-      ...offerDto,
-      description: 'Node-level description',
-      nodeOffers: [
-        {
-          ...baseNodeOffer,
-          description: null,
-        },
-      ],
+      id: '',
+      type: 'Question',
+      attributeKey: null,
+      title: '',
+      description: null,
+      mediaUrl: null,
+      positionX: 0,
+      positionY: 0,
+      options: [],
+      nodeOffers: [],
+      answerType: AnswerType.SingleChoice
     }
     const node = flowNodeToNode(dto)
     if (node.data.type === NodeType.Offer) {
@@ -174,17 +182,17 @@ describe('flowNodeToNode', () => {
 
   it('falls back to first nodeOffer when none is marked isPrimary', () => {
     const dto: FlowNodeDto = {
-      ...offerDto,
-      nodeOffers: [
-        {
-          ...baseNodeOffer,
-          isPrimary: false,
-          ctaText: 'Start',
-          price: 9.99,
-          physicalWellnessKitName: null,
-          physicalWellnessKitItems: null,
-        },
-      ],
+      id: '',
+      type: 'Question',
+      attributeKey: null,
+      title: '',
+      description: null,
+      mediaUrl: null,
+      positionX: 0,
+      positionY: 0,
+      options: [],
+      nodeOffers: [],
+      answerType: AnswerType.SingleChoice
     }
     const node = flowNodeToNode(dto)
     if (node.data.type === NodeType.Offer) {
