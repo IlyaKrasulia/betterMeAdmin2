@@ -23,8 +23,7 @@
       "@api/*": ["./src/api/*"],
       "@pages/*": ["./src/pages/*"],
       "@assets/*": ["./src/assets/*"]
-    }
+    },
   },
-  "include": ["src"],
-  "references": [{ "path": "./tsconfig.node.json" }]
+  "include": ["src"]
 }
