@@ -38,6 +38,7 @@ import type {
 } from "@shared/types/dag.types";
 import type { Edge, Node } from "reactflow";
 import toast from "react-hot-toast";
+import { set } from "react-hook-form";
 
 /* ── Height chain explanation ───────────────────────────────────────────
    html/body → #root (flex column, min-h: 100vh)
@@ -90,10 +91,8 @@ export function DagEditorPage() {
   const nodes = useDagStore((s) => s.nodes);
   const edges = useDagStore((s) => s.edges);
   const isDirty = useDagStore((s) => s.isDirty);
-  const needToUpdate = useDagStore((s) => s.touched);
   const markSaved = useDagStore((s) => s.markSaved);
-
-  console.log(needToUpdate, " => needToUpdate");
+  const setAllIsLocal = useDagStore((s) => s.setAllIsLocal);
 
   // Track the original API data for diffing on save
   const originalNodesRef = useRef<FlowNodeDto[]>([]);
@@ -178,74 +177,6 @@ export function DagEditorPage() {
     return JSON.stringify(formattedData, null, 2);
   };
 
-  // Detect whether an existing edge's conditions OR priority have changed
-  const edgeConditionChanged = (edge: Edge, orig: FlowEdgeDto): boolean => {
-    const cond = getEdgeConditions(edge);
-
-    // Priority change always triggers update
-    if ((cond.priority ?? 0) !== (orig.priority ?? 0)) return true;
-
-    const newIsAlways = cond.always || cond.rules.length === 0;
-    const origIsAlways = !orig.conditions;
-
-    if (newIsAlways && origIsAlways) return false;
-    if (newIsAlways !== origIsAlways) return true;
-
-    // Both have rules — compare them
-    try {
-      const parsed = JSON.parse(orig.conditions!) as unknown;
-      type NormRule = {
-        attributeKey: string;
-        operator: string;
-        value: string;
-        valueTo?: string;
-      };
-      let origRules: NormRule[];
-
-      if (Array.isArray(parsed)) {
-        type BR = {
-          AttributeKey?: string;
-          Operator?: string;
-          Value?: string;
-          ValueTo?: string;
-        };
-        origRules = (parsed as BR[]).map((r) => ({
-          attributeKey: r.AttributeKey ?? "",
-          operator: r.Operator ?? "eq",
-          value: r.Value ?? "",
-          ...(r.ValueTo !== undefined ? { valueTo: r.ValueTo } : {}),
-        }));
-      } else if (
-        parsed &&
-        typeof parsed === "object" &&
-        (parsed as { rules?: unknown }).rules
-      ) {
-        const legacy = parsed as {
-          rules: Array<{ attribute?: string; op?: string; value?: string }>;
-        };
-        origRules = legacy.rules.map((r) => ({
-          attributeKey: r.attribute ?? "",
-          operator: r.op ?? "eq",
-          value: r.value ?? "",
-        }));
-      } else {
-        return true;
-      }
-
-      const newRules = cond.rules;
-      if (origRules.length !== newRules.length) return true;
-      return origRules.some(
-        (r, i) =>
-          r.attributeKey !== newRules[i].attributeKey ||
-          r.operator !== (newRules[i].operator ?? "eq") ||
-          r.value !== newRules[i].value ||
-          (r.valueTo ?? "") !== (newRules[i].valueTo ?? ""),
-      );
-    } catch {
-      return true;
-    }
-  };
-
   const syncOptionsForNode = async (
     node: Node<DagNodeData>,
     origNode: FlowNodeDto,
@@ -257,7 +188,6 @@ export function DagEditorPage() {
     const currentOptionIds = new Set(qData.options.map((o) => o.id));
 
     // 1. Видаляємо ті, яких більше немає в канвасі
-    // Робимо це першими, щоб звільнити displayOrder (якщо бекенд це валідує)
     const toDelete = origOptions.filter((o) => !currentOptionIds.has(o.id));
     await Promise.all(
       toDelete.map((o) => optionsApi.deleteOption(node.id, o.id)),
@@ -297,7 +227,6 @@ export function DagEditorPage() {
   // ── Save handler — diffs current canvas state against the loaded API data ──
   const handleSave = async () => {
     setIsSaving(true);
-    // Отримуємо поточне стан "затронутых" елементів зі стора
     const { touched } = useDagStore.getState();
 
     try {
@@ -426,7 +355,8 @@ export function DagEditorPage() {
 
       if (updated) {
         // ... оновлюємо локальний стан новими даними з сервера
-        markSaved(); // СБРОС touched и isDirty
+        markSaved(); // СБРОС touched  і isDirty
+        setAllIsLocal(false);
         toast.success("Survey saved!");
       }
     } catch (err) {

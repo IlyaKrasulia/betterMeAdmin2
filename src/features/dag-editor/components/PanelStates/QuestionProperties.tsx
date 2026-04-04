@@ -13,6 +13,7 @@ export function QuestionProperties({ node }: { node: Node<DagNodeData> }) {
   const updateNodeData = useDagStore((s) => s.updateNodeData);
   const data = node.data as import("@shared/types/dag.types").QuestionNodeData;
 
+  console.log(data);
   const addOption = () => {
     const currentOptions = data.options ?? [];
     const uid = crypto.randomUUID().slice(0, 8);
@@ -94,6 +95,7 @@ export function QuestionProperties({ node }: { node: Node<DagNodeData> }) {
               valueKind: e.target.value as ValueKind,
             } as Partial<DagNodeData>)
           }
+          disabled={!node?.isLocal}
         />
         <Select
           label="Answer type"

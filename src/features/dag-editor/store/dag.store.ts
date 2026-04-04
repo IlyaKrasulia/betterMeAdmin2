@@ -12,12 +12,11 @@ interface DagState {
   entryNodeId: string | null;
   isDirty: boolean;
 
-  // Отслеживание изменений для точечного сохранения
   touched: {
-    nodes: Set<string>; // Созданные или отредактированные ноды
-    edges: Set<string>; // Созданные или отредактированные ребра
-    deletedNodes: Set<string>; // ID удаленных нод
-    deletedEdges: Set<string>; // ID удаленных ребер
+    nodes: Set<string>;
+    edges: Set<string>;
+    deletedNodes: Set<string>;
+    deletedEdges: Set<string>;
   };
 
   // Actions
@@ -37,6 +36,7 @@ interface DagState {
   setSelectedEdge: (id: string | null) => void;
   updateEdgeCondition: (id: string, conditions: EdgeConditions) => void;
   setEntryNodeId: (id: string | null) => void;
+  setAllIsLocal: (isLocal: boolean) => void;
   markSaved: () => void;
 }
 
@@ -233,6 +233,12 @@ export const useDagStore = create<DagState>((set, get) => ({
       isDirty: false,
       touched: initialTouched(),
     }),
+
+  setAllIsLocal: (isLocal) =>
+    set((s) => ({
+      nodes: s.nodes.map((n) => ({ ...n, isLocal })),
+      edges: s.edges.map((e) => ({ ...e, isLocal })),
+    })),
 }));
 
 // Selectors (без изменений)
