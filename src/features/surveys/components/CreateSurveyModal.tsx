@@ -303,7 +303,6 @@ export function CreateSurveyModal({ open, onClose }: CreateSurveyModalProps) {
               <PickCardContent>
                 <PickCardTitle>
                   Generate with AI
-                  <AiBadge>New</AiBadge>
                 </PickCardTitle>
                 <PickCardDesc>Describe your survey and let AI build the entire flow for you</PickCardDesc>
               </PickCardContent>
@@ -457,17 +456,6 @@ const PickCardDesc = styled.span`
   font-size: ${({ theme }) => theme.typography.sizes.sm};
   color: ${({ theme }) => theme.colors.textSecondary};
   line-height: ${({ theme }) => theme.typography.lineHeights.normal};
-`
-
-const AiBadge = styled.span`
-  font-size: 10px;
-  font-weight: ${({ theme }) => theme.typography.weights.semibold};
-  padding: 2px 8px;
-  border-radius: ${({ theme }) => theme.radii.full};
-  background: linear-gradient(135deg, #f59e0b, #ef4444);
-  color: #fff;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
 `
 
 // --- AI Form ---

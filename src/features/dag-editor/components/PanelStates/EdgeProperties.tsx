@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import styled from "styled-components";
 import { Plus, Trash2, GitBranch, Infinity } from "lucide-react";
 import type { Edge } from "reactflow";
@@ -59,6 +59,8 @@ const OPERATORS: Record<AttrKind, { value: EdgeOperator; label: string }[]> = {
   ],
 };
 
+const QUERY_OPERATORS = ["AND", "OR"] as const;
+
 // Default operator when switching attribute kinds
 const DEFAULT_OP: Record<AttrKind, EdgeOperator> = {
   numeric: "eq",
@@ -81,6 +83,10 @@ export const EdgeProperties = ({
 }) => {
   const updateEdgeCondition = useDagStore((s) => s.updateEdgeCondition);
   const nodes = useDagStore((s) => s.nodes);
+
+  const [activeOperator, setActiveOperator] = useState<EdgeOperator>(
+    edge.data?.operator ?? "AND",
+  );
 
   // Build attribute metadata map from all Question nodes in the graph:
   // attributeKey → { kind: 'numeric'|'enum'|'text', options? }
@@ -110,11 +116,20 @@ export const EdgeProperties = ({
     return "text";
   };
 
+  console.log(edge);
+
   const conditions: EdgeConditions =
     edge.data?.conditions ?? DEFAULT_CONDITIONS;
 
-  const update = (patch: Partial<EdgeConditions>) => {
-    updateEdgeCondition(edge.id, { ...conditions, ...patch });
+  const update = (
+    patch: Partial<EdgeConditions> | null,
+    operator?: "AND" | "OR",
+  ) => {
+    updateEdgeCondition(edge.id, {
+      ...conditions,
+      ...(patch ?? {}),
+      operator: operator ?? "AND",
+    });
   };
 
   const addRule = () => {
@@ -240,7 +255,7 @@ export const EdgeProperties = ({
       {/* ── Condition rules ── */}
       {!conditions.always && (
         <FieldGroup>
-          <GroupLabel>Conditions (AND)</GroupLabel>
+          <GroupLabel>Conditions</GroupLabel>
 
           {conditions.rules.length === 0 && (
             <HintText>
@@ -248,10 +263,19 @@ export const EdgeProperties = ({
             </HintText>
           )}
 
+          <Select
+            label="Operator"
+            value={activeOperator}
+            options={QUERY_OPERATORS.map((op) => ({ value: op, label: op }))}
+            onChange={(e) => {
+              update(null, e.target.value as "AND" | "OR");
+              setActiveOperator(e.target.value as EdgeOperator);
+            }}
+          />
+
           {conditions.rules.map((rule, idx) => {
             const kind = getKind(rule.attributeKey);
             const meta = attrMeta[rule.attributeKey];
-            const operatorList = OPERATORS[kind];
             const selectedValues = rule.value
               ? rule.value.split(",").filter(Boolean)
               : [];

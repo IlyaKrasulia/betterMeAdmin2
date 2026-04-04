@@ -108,6 +108,9 @@ export function DagEditorPage() {
       originalNodesRef.current = safeNodes;
       originalEdgesRef.current = safeEdges;
 
+      console.log(safeEdges, ' => safe edges');
+      
+
       const dagNodes = safeNodes.map(flowNodeToNode);
       const dagEdges = safeEdges.map(flowEdgeToEdge);
 
@@ -319,7 +322,7 @@ export function DagEditorPage() {
                 sourceNodeId: resolveNodeId(edge.source),
                 targetNodeId: resolveNodeId(edge.target),
                 priority: getEdgeConditions(edge).priority,
-                conditionsJson: toConditionsJson(edge, "OR"),
+                conditionsJson: toConditionsJson(edge, edge.data.conditions.operator as "AND" |  "OR"),
               },
             });
           } else {
@@ -329,7 +332,7 @@ export function DagEditorPage() {
               edgeId: edge.id,
               data: {
                 priority: getEdgeConditions(edge).priority,
-                conditionsJson: toConditionsJson(edge, "OR"),
+                conditionsJson: toConditionsJson(edge, edge.data.conditions.operator as "AND" |  "OR"),
               },
             });
           }

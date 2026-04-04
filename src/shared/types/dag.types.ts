@@ -85,7 +85,9 @@ export interface OfferNodeData {
   offerId?: string
 }
 
-export type DagNodeData = QuestionNodeData | InfoNodeData | OfferNodeData
+export type DagNodeData = (QuestionNodeData | InfoNodeData | OfferNodeData) & {
+  isLocal?: boolean
+}
 
 // ─── DAG Node (React Flow node) ───────────────────────────────────────────────
 
@@ -94,6 +96,7 @@ export interface DagNode {
   type: NodeType
   position: { x: number; y: number }
   data: DagNodeData
+  isLocal?: boolean
 }
 
 // ─── Edge Conditions ─────────────────────────────────────────────────────────
@@ -141,6 +144,7 @@ export interface EdgeConditions {
   always: boolean           // true = unconditional; conditionsJson will be null
   rules: EdgeConditionRule[] // AND logic; ignored when always=true
   priority: number          // higher = evaluated first; 0 = lowest (default for fallback)
+  operator?: "AND" | "OR" // how to combine multiple rules; default is "AND"
 }
 
 // ─── DAG Edge (React Flow edge + conditions) ─────────────────────────────────

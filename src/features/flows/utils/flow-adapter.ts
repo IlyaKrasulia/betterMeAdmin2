@@ -120,13 +120,14 @@ export function flowEdgeToEdge(dto: FlowEdgeDto): Edge {
 
   const conditionJson = dto?.conditions as string ?? null;
   let conditions: EdgeConditions = conditionJson ? JSON.parse(conditionJson) : { always: true, rules: [], priority };
+  let operator: "AND" | "OR" = "AND"; // default to AND if not specified
 
   if (dto.conditions) {
     try {
-      const parsed = JSON.parse(dto.conditions) as { rules?: unknown };
+      const parsed = JSON.parse(dto.conditions) as { rules?: unknown, operator?: "AND" | "OR" };
 
+      operator = parsed.operator || "AND";
       if (parsed) {
-        // Canonical backend format: [{ AttributeKey, Operator?, Value, ValueTo? }]
         type BackendRule = {
           AttributeKey?: string;
           Operator?: string;
@@ -192,13 +193,16 @@ export function flowEdgeToEdge(dto: FlowEdgeDto): Edge {
     label = priority > 0 ? `${rulesLabel} · p${priority}` : rulesLabel;
   }
 
+  console.log(conditions);
+  
+
   return {
     id: dto.id,
     source: dto.sourceNodeId,
     target: dto.targetNodeId,
     type: "conditionEdge",
     markerEnd: { type: MarkerType.ArrowClosed, width: 18, height: 18 },
-    data: { label, conditions },
+    data: { label, conditions, operator },
   };
 }
 

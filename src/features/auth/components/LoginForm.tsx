@@ -6,7 +6,7 @@ import styled from "styled-components";
 import { motion } from "framer-motion";
 import { Input } from "@shared/ui/Input";
 import { Button } from "@shared/ui/Button";
-import { useLogin, useDemoLogin } from "../hooks/useAuth";
+import { useLogin } from "../hooks/useAuth";
 
 const loginSchema = z.object({
   email: z.string().min(1, "Email is required").email("Enter a valid email"),
@@ -17,7 +17,6 @@ type LoginFormValues = z.infer<typeof loginSchema>;
 
 export function LoginForm() {
   const { mutate, isPending } = useLogin();
-  // const enterDemo = useDemoLogin(); 
 
   const {
     register,
