@@ -25,7 +25,8 @@ import { Button } from "@shared/ui/Button";
 import { Spinner } from "@shared/ui/Spinner";
 import { useFlow } from "@features/flows/hooks/useFlows";
 import { formatDate, formatNumber } from "@shared/utils/format";
-import type { FlowNodeDto, FlowEdgeDto } from "@shared/types/api.types";
+import type { FlowNodeDto } from "@shared/types/api.types";
+import { FlowPathSankey } from "@features/analytics/components/FlowPathSankey";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -38,41 +39,6 @@ function pct(value: number): string {
   return `${value.toFixed(1)}%`;
 }
 
-/** Build the most popular path by following the highest-traffic edges from entry node */
-function buildPopularPath(
-  entryNodeId: string | null,
-  nodes: FlowNodeDto[],
-  edges: FlowEdgeDto[]
-): FlowNodeDto[] {
-  if (!entryNodeId) return [];
-  const nodeMap = new Map(nodes.map((n) => [n.id, n]));
-  const path: FlowNodeDto[] = [];
-  const visited = new Set<string>();
-  let currentId: string | null = entryNodeId;
-
-  while (currentId && !visited.has(currentId)) {
-    visited.add(currentId);
-    const node = nodeMap.get(currentId);
-    if (!node) break;
-    path.push(node);
-
-    const outgoing = edges.filter((e) => e.sourceNodeId === currentId);
-    if (outgoing.length === 0) break;
-
-    let bestTarget: string | null = null;
-    let bestCount = -1;
-    for (const edge of outgoing) {
-      const target = nodeMap.get(edge.targetNodeId);
-      const count = target?.stats?.answerCount ?? 0;
-      if (count > bestCount) {
-        bestCount = count;
-        bestTarget = edge.targetNodeId;
-      }
-    }
-    currentId = bestTarget;
-  }
-  return path;
-}
 
 /** Gather offer stats from offer nodes */
 function gatherOfferStats(nodes: FlowNodeDto[]) {
@@ -162,10 +128,11 @@ export function FlowStatsPage() {
     [flow?.nodes]
   );
 
-  const popularPath = useMemo(
-    () => buildPopularPath(flow?.entryNodeId ?? null, flow?.nodes ?? [], flow?.edges ?? []),
-    [flow?.entryNodeId, flow?.nodes, flow?.edges]
-  );
+  const popularPathData = useMemo(() => {
+    const paths = flow?.pathDistribution ?? [];
+    if (paths.length === 0) return null;
+    return paths.reduce((best, p) => (p.count > best.count ? p : best), paths[0]);
+  }, [flow?.pathDistribution]);
 
   const { offers, totalImpressions } = useMemo(
     () => gatherOfferStats(flow?.nodes ?? []),
@@ -332,11 +299,12 @@ export function FlowStatsPage() {
         )}
 
         {/* ── Most Popular Path ──────────────────────────────────────── */}
-        {popularPath.length > 1 && (
+        {popularPathData && popularPathData.nodes.length > 1 && (
           <>
             <SectionTitle><GitBranch size={18} /> Most Popular Path</SectionTitle>
+            <PopularPathBadge>{formatNumber(popularPathData.count)} users took this path</PopularPathBadge>
             <PathContainer>
-              {popularPath.map((node, i) => (
+              {popularPathData.nodes.map((node, i) => (
                 <PathItem key={node.id}>
                   <PathNode
                     initial={{ opacity: 0, scale: 0.95 }}
@@ -351,12 +319,20 @@ export function FlowStatsPage() {
                       <PathNodeTitle>{node.title || "Untitled"}</PathNodeTitle>
                       <PathNodeMeta>{node.type}</PathNodeMeta>
                     </PathNodeInfo>
-                    <PathNodeCount>{formatNumber(node.stats?.answerCount ?? 0)}</PathNodeCount>
+                    <PathNodeCount>{formatNumber(popularPathData.count)}</PathNodeCount>
                   </PathNode>
-                  {i < popularPath.length - 1 && <PathConnector />}
+                  {i < popularPathData.nodes.length - 1 && <PathConnector />}
                 </PathItem>
               ))}
             </PathContainer>
+          </>
+        )}
+
+        {/* ── Flow Path Sankey ──────────────────────────────────────── */}
+        {(flow.pathDistribution ?? []).length > 0 && (
+          <>
+            <SectionTitle><GitBranch size={18} /> All User Paths</SectionTitle>
+            <FlowPathSankey paths={flow.pathDistribution!} />
           </>
         )}
 
@@ -803,6 +779,12 @@ const DropOffCount = styled.span`
 `;
 
 // ── Popular Path ─────────────────────────────────────────────────────────────
+
+const PopularPathBadge = styled.div`
+  font-size: ${({ theme }) => theme.typography.sizes.xs};
+  color: ${({ theme }) => theme.colors.textTertiary};
+  margin-bottom: 8px;
+`;
 
 const PathContainer = styled.div`
   display: flex;

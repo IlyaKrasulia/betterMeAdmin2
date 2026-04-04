@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { flowsApi } from '@api/flows.api'
-import type { CreateFlowRequest, UpdateFlowRequest, SetEntryNodeRequest } from '@shared/types/api.types'
+import type { CreateFlowRequest, GenerateFlowRequest, UpdateFlowRequest, SetEntryNodeRequest } from '@shared/types/api.types'
 
 export function useFlows() {
   return useQuery({
@@ -24,6 +24,12 @@ export function useCreateFlow() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['flows'] })
     },
+  })
+}
+
+export function useStartGenerateFlow() {
+  return useMutation({
+    mutationFn: (data: GenerateFlowRequest) => flowsApi.generateFlow(data),
   })
 }
 
