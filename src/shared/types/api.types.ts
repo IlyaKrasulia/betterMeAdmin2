@@ -76,6 +76,7 @@ export interface FlowNodeStatsDto {
   offerImpressions: number;
   offerConversions: number;
   offerConversionRate: number;
+  avgAnswerDuration: string | null;
 }
 
 export interface FlowNodeDto {
@@ -120,6 +121,14 @@ export interface FlowStatsDto {
   totalOfferImpressions: number;
   totalOfferConversions: number;
   offerConversionRate: number;
+  avgSessionDuration: string | null;
+  medianSessionDuration: string | null;
+  minSessionDuration: string | null;
+  maxSessionDuration: string | null;
+  avgAnswerDuration: string | null;
+  medianAnswerDuration: string | null;
+  minAnswerDuration: string | null;
+  maxAnswerDuration: string | null;
 }
 
 export interface FlowPathNodeDto {
@@ -549,6 +558,8 @@ export interface GlobalOfferStatsItem {
   offerId: string;
   offerName: string;
   offerSlug: string;
+  flowId: string;
+  flowName: string;
   timesPresented: number;
   timesConverted: number;
   conversionRate: number;
