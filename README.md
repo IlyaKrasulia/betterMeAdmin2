@@ -4,6 +4,18 @@ Admin panel for building, publishing, and analysing personalisation quiz flows. 
 
 ---
 
+ADMIN CREDS
+```
+EMAIL = admin@example.com
+PASSWORD = Admin123!
+```
+
+DEPLOYED - [here](https://hackaton-task-b8310a8937f5.herokuapp.com/swagger/index.html)
+
+FRONTEND DEPLOY - [here](https://better-me-admin2-lzwt.vercel.app/)
+
+BACKEND REPO - [here](https://github.com/ProdunVladyslav/Hackaton_INT20_26_Task)
+
 ## Table of Contents
 
 1. [Pages](#pages)
