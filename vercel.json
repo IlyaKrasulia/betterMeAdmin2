@@ -5,7 +5,11 @@
       "destination": "https://hackaton-task-b8310a8937f5.herokuapp.com/api/:path*"
     },
     {
-      "source": "/((?!api/).*)",
+      "source": "/swagger/:path*",
+      "destination": "https://hackaton-task-b8310a8937f5.herokuapp.com/swagger/:path*"
+    },
+    {
+      "source": "/((?!api/|swagger/).*)",
       "destination": "/index.html"
     }
   ]
