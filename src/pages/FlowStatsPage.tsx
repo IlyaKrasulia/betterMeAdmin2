@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import styled, { useTheme } from "styled-components";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { useParams, useNavigate } from "@tanstack/react-router";
 import {
   ArrowLeft,
@@ -19,12 +19,14 @@ import {
   Award,
   AlertTriangle,
   ChevronDown,
+  Timer,
 } from "lucide-react";
 import { AdminLayout } from "@/components/AdminLayout";
 import { Button } from "@shared/ui/Button";
 import { Spinner } from "@shared/ui/Spinner";
 import { useFlow } from "@features/flows/hooks/useFlows";
 import { formatDate, formatNumber } from "@shared/utils/format";
+import { DONUT_COLORS, D_CX, D_CY, D_R, D_r, D_GAP, dSectorRaw, dSector } from "@shared/utils/donut";
 import type { FlowNodeDto } from "@shared/types/api.types";
 import { FlowPathSankey } from "@features/analytics/components/FlowPathSankey";
 
@@ -37,6 +39,21 @@ const OFFERS_INITIAL_SHOW = 5;
 /** Backend returns rates as already-multiplied percentages (e.g. 72.73 = 72.73%) */
 function pct(value: number): string {
   return `${value.toFixed(1)}%`;
+}
+
+/** Parse "hh:mm:ss.fffffff" into a human-readable string like "1m 23s" or "45.3s" */
+function formatDuration(raw: string | null | undefined): string {
+  if (!raw) return "—";
+  const parts = raw.split(":");
+  if (parts.length < 3) return "—";
+  const h = parseInt(parts[0], 10);
+  const m = parseInt(parts[1], 10);
+  const s = parseFloat(parts[2]);
+  const totalSeconds = h * 3600 + m * 60 + s;
+  if (totalSeconds === 0) return "0s";
+  if (h > 0) return `${h}h ${m}m ${Math.round(s)}s`;
+  if (m > 0) return `${m}m ${Math.round(s)}s`;
+  return `${s < 10 ? s.toFixed(1) : Math.round(s)}s`;
 }
 
 
@@ -120,6 +137,7 @@ export function FlowStatsPage() {
   const theme = useTheme();
   const { data: flow, isLoading, isError } = useFlow(flowId);
   const [showAllOffers, setShowAllOffers] = useState(false);
+  const [hoveredSector, setHoveredSector] = useState<number | null>(null);
 
   const stats = flow?.stats;
 
@@ -139,6 +157,14 @@ export function FlowStatsPage() {
     [flow?.nodes]
   );
 
+  const nodeStatsMap = useMemo(() => {
+    const map: Record<string, { answerCount: number; droppedOffCount: number; offerImpressions?: number; offerConversions?: number; offerConversionRate?: number; avgAnswerDuration?: string | null }> = {};
+    for (const n of flow?.nodes ?? []) {
+      if (n.stats) map[n.id] = { answerCount: n.stats.answerCount ?? 0, droppedOffCount: n.stats.droppedOffCount ?? 0, offerImpressions: n.stats.offerImpressions, offerConversions: n.stats.offerConversions, offerConversionRate: n.stats.offerConversionRate, avgAnswerDuration: n.stats.avgAnswerDuration };
+    }
+    return map;
+  }, [flow?.nodes]);
+
   const dropOffRanking = useMemo(
     () => buildDropOffRanking(flow?.nodes ?? []),
     [flow?.nodes]
@@ -146,6 +172,17 @@ export function FlowStatsPage() {
 
   const visibleOffers = showAllOffers ? offers : offers.slice(0, OFFERS_INITIAL_SHOW);
   const hasMoreOffers = offers.length > OFFERS_INITIAL_SHOW;
+
+  const sectors = useMemo(() => {
+    if (totalImpressions === 0) return [];
+    let angle = -Math.PI / 2;
+    return offers.map((offer, i) => {
+      const span = (offer.impressions / totalImpressions) * Math.PI * 2;
+      const start = angle;
+      angle += span;
+      return { start, end: angle, span, offer, color: DONUT_COLORS[i % DONUT_COLORS.length] };
+    });
+  }, [offers, totalImpressions]);
 
   if (isLoading) {
     return (
@@ -194,17 +231,19 @@ export function FlowStatsPage() {
         <SectionTitle>Overview</SectionTitle>
         <KpiGrid>
           {[
-            { label: "Total Sessions", value: formatNumber(stats?.totalSessions ?? 0), color: theme.colors.accent, icon: <Users size={18} /> },
-            { label: "Completed", value: formatNumber(stats?.completedSessions ?? 0), color: theme.colors.success, icon: <CheckCircle2 size={18} /> },
-            { label: "Abandoned", value: formatNumber(stats?.abandonedSessions ?? 0), color: theme.colors.error, icon: <XCircle size={18} /> },
-            { label: "In Progress", value: formatNumber(stats?.inProgressSessions ?? 0), color: theme.colors.warning, icon: <Clock size={18} /> },
-            { label: "Completion Rate", value: pct(stats?.completionRate ?? 0), color: theme.colors.success, icon: <TrendingUp size={18} /> },
-            { label: "Abandon Rate", value: pct(stats?.abandonRate ?? 0), color: theme.colors.error, icon: <TrendingUp size={18} /> },
+            { label: "Total Sessions",   value: formatNumber(stats?.totalSessions ?? 0),     color: theme.colors.accent,  icon: <Users size={15} /> },
+            { label: "Completed",        value: formatNumber(stats?.completedSessions ?? 0),  color: theme.colors.success, icon: <CheckCircle2 size={15} /> },
+            { label: "Abandoned",        value: formatNumber(stats?.abandonedSessions ?? 0),  color: theme.colors.error,   icon: <XCircle size={15} /> },
+            { label: "In Progress",      value: formatNumber(stats?.inProgressSessions ?? 0), color: theme.colors.warning, icon: <Clock size={15} /> },
+            { label: "Completion Rate",  value: pct(stats?.completionRate ?? 0),              color: theme.colors.success, icon: <TrendingUp size={15} /> },
+            { label: "Abandon Rate",     value: pct(stats?.abandonRate ?? 0),                 color: theme.colors.error,   icon: <TrendingUp size={15} /> },
           ].map((kpi, i) => (
             <KpiCard key={kpi.label} $index={i} $color={kpi.color}>
               <KpiIconWrap $color={kpi.color}>{kpi.icon}</KpiIconWrap>
-              <KpiValue>{kpi.value}</KpiValue>
-              <KpiLabel>{kpi.label}</KpiLabel>
+              <KpiContent>
+                <KpiValue>{kpi.value}</KpiValue>
+                <KpiLabel>{kpi.label}</KpiLabel>
+              </KpiContent>
             </KpiCard>
           ))}
         </KpiGrid>
@@ -217,13 +256,209 @@ export function FlowStatsPage() {
           <StructureChip><GitBranch size={13} color={theme.colors.textTertiary} />{stats?.edgeCount ?? 0} Edges</StructureChip>
         </StructureRow>
 
+        {/* ── All User Paths (moved up) ─────────────────────────────────── */}
+        {(flow.pathDistribution ?? []).length > 0 && (
+          <>
+            <SectionTitle><GitBranch size={18} /> All User Paths</SectionTitle>
+            <FlowPathSankey paths={flow.pathDistribution!} nodeStatsMap={nodeStatsMap} />
+          </>
+        )}
+
+        {/* ── Session Timing ────────────────────────────────────────────── */}
+        <SectionTitle><Timer size={18} /> Session Timing</SectionTitle>
+        <TimingGrid>
+          {[
+            {
+              label: "Session Duration", $color: theme.colors.accent,
+              items: [
+                { label: "Avg",    value: formatDuration(stats?.avgSessionDuration),    $c: theme.colors.accent  },
+                { label: "Median", value: formatDuration(stats?.medianSessionDuration), $c: theme.colors.info    },
+                { label: "Min",    value: formatDuration(stats?.minSessionDuration),    $c: theme.colors.success },
+                { label: "Max",    value: formatDuration(stats?.maxSessionDuration),    $c: theme.colors.warning },
+              ],
+            },
+            {
+              label: "Answer Duration", $color: theme.colors.info,
+              items: [
+                { label: "Avg",    value: formatDuration(stats?.avgAnswerDuration),    $c: theme.colors.accent  },
+                { label: "Median", value: formatDuration(stats?.medianAnswerDuration), $c: theme.colors.info    },
+                { label: "Min",    value: formatDuration(stats?.minAnswerDuration),    $c: theme.colors.success },
+                { label: "Max",    value: formatDuration(stats?.maxAnswerDuration),    $c: theme.colors.warning },
+              ],
+            },
+          ].map((group) => (
+            <TimingGroup key={group.label} $color={group.$color}>
+              <TimingGroupLabel $color={group.$color}>{group.label}</TimingGroupLabel>
+              <TimingRow>
+                {group.items.map((item) => (
+                  <TimingCell key={item.label}>
+                    <TimingValue $color={item.$c}>{item.value}</TimingValue>
+                    <TimingLabel>{item.label}</TimingLabel>
+                  </TimingCell>
+                ))}
+              </TimingRow>
+            </TimingGroup>
+          ))}
+        </TimingGrid>
+
         {/* ── Offer Performance ─────────────────────────────────────────── */}
         <SectionTitle><Eye size={18} /> Offer Performance</SectionTitle>
         <OfferKpiRow>
-          <OfferKpiCard><OfferKpiValue>{formatNumber(stats?.totalOfferImpressions ?? 0)}</OfferKpiValue><OfferKpiLabel>Impressions</OfferKpiLabel></OfferKpiCard>
-          <OfferKpiCard><OfferKpiValue>{formatNumber(stats?.totalOfferConversions ?? 0)}</OfferKpiValue><OfferKpiLabel>Conversions</OfferKpiLabel></OfferKpiCard>
-          <OfferKpiCard><OfferKpiValue>{pct(stats?.offerConversionRate ?? 0)}</OfferKpiValue><OfferKpiLabel>Conversion Rate</OfferKpiLabel></OfferKpiCard>
+          {(() => {
+            const cvr = stats?.offerConversionRate ?? 0;
+            const cvrColor = cvr >= 50 ? theme.colors.success : cvr >= 20 ? theme.colors.warning : theme.colors.error;
+            return [
+              { label: "Impressions",     value: formatNumber(stats?.totalOfferImpressions ?? 0), color: theme.colors.accent,  icon: <Eye size={16} /> },
+              { label: "Conversions",     value: formatNumber(stats?.totalOfferConversions ?? 0),  color: theme.colors.success, icon: <CheckCircle2 size={16} /> },
+              { label: "Conversion Rate", value: pct(cvr),                                         color: cvrColor,             icon: <TrendingUp size={16} /> },
+            ].map((k) => (
+              <OfferKpiCard key={k.label} $color={k.color}>
+                <OfferKpiIcon $color={k.color}>{k.icon}</OfferKpiIcon>
+                <div>
+                  <OfferKpiValue $color={k.color}>{k.value}</OfferKpiValue>
+                  <OfferKpiLabel>{k.label}</OfferKpiLabel>
+                </div>
+              </OfferKpiCard>
+            ));
+          })()}
         </OfferKpiRow>
+
+        {sectors.length > 0 && (
+          <OfferVizSection>
+            <OfferVizRow>
+              <OfferDonutBox>
+                <svg width={240} height={240} viewBox="0 0 240 240" style={{ overflow: 'visible' }}>
+                  {sectors.map((s, i) => {
+                    const isHov = hoveredSector === i;
+                    const anyHov = hoveredSector !== null;
+                    const span = s.end - s.start;
+                    const hg = Math.min(D_GAP / 2, span * 0.08);
+                    const a1 = s.start + hg, a2 = s.end - hg;
+                    const convFrac = s.offer.conversionRate / 100;
+                    const mid = a1 + (a2 - a1) * convFrac;
+
+                    return (
+                      <motion.g
+                        key={i}
+                        animate={{
+                          opacity: anyHov && !isHov ? 0.22 : 1,
+                          scale: isHov ? 1.06 : 1,
+                        }}
+                        transition={{ duration: 0.22, ease: 'easeOut' }}
+                        style={{ transformOrigin: `${D_CX}px ${D_CY}px`, cursor: 'pointer' }}
+                        onMouseEnter={() => setHoveredSector(i)}
+                        onMouseLeave={() => setHoveredSector(null)}
+                      >
+                        {/* Base sector — fades out on hover */}
+                        <motion.path
+                          d={dSector(s.start, s.end)}
+                          fill={s.color}
+                          animate={{ opacity: isHov ? 0 : 1 }}
+                          transition={{ duration: 0.18 }}
+                        />
+                        {/* Converted arc — fades in on hover */}
+                        <AnimatePresence>
+                          {isHov && convFrac > 0.005 && (
+                            <motion.path
+                              key="conv"
+                              d={dSectorRaw(a1, mid, D_R + 6, D_r - 4)}
+                              fill="#10b981"
+                              initial={{ opacity: 0 }}
+                              animate={{ opacity: 1 }}
+                              exit={{ opacity: 0 }}
+                              transition={{ duration: 0.2 }}
+                            />
+                          )}
+                        </AnimatePresence>
+                        {/* Not-converted arc — fades in on hover */}
+                        <AnimatePresence>
+                          {isHov && convFrac < 0.995 && (
+                            <motion.path
+                              key="noconv"
+                              d={dSectorRaw(mid, a2, D_R + 6, D_r - 4)}
+                              fill={s.color}
+                              initial={{ opacity: 0 }}
+                              animate={{ opacity: 0.38 }}
+                              exit={{ opacity: 0 }}
+                              transition={{ duration: 0.2 }}
+                            />
+                          )}
+                        </AnimatePresence>
+                      </motion.g>
+                    );
+                  })}
+
+                  {/* Center label — crossfades between default and hover state */}
+                  <AnimatePresence mode="wait">
+                    {hoveredSector !== null ? (() => {
+                      const o = sectors[hoveredSector].offer;
+                      const short = o.name.length > 18 ? o.name.slice(0, 16) + '…' : o.name;
+                      return (
+                        <motion.g key="hov" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
+                          <text x={D_CX} y={D_CY - 14} textAnchor="middle" fill={theme.colors.textPrimary} fontSize="11" fontWeight="600" fontFamily="inherit">{short}</text>
+                          <text x={D_CX} y={D_CY + 4}  textAnchor="middle" fill="#10b981" fontSize="18" fontWeight="700" fontFamily="inherit">{o.conversionRate % 1 === 0 ? o.conversionRate : o.conversionRate.toFixed(1)}%</text>
+                          <text x={D_CX} y={D_CY + 20} textAnchor="middle" fill={theme.colors.textTertiary} fontSize="10" fontFamily="inherit">CVR</text>
+                          <text x={D_CX} y={D_CY + 36} textAnchor="middle" fill={theme.colors.textTertiary} fontSize="10" fontFamily="inherit">{o.impressions} impr.</text>
+                        </motion.g>
+                      );
+                    })() : (
+                      <motion.g key="def" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
+                        <text x={D_CX} y={D_CY - 4}  textAnchor="middle" fill={theme.colors.textPrimary} fontSize="24" fontWeight="700" fontFamily="inherit">{totalImpressions}</text>
+                        <text x={D_CX} y={D_CY + 16} textAnchor="middle" fill={theme.colors.textTertiary} fontSize="11" fontFamily="inherit">impressions</text>
+                      </motion.g>
+                    )}
+                  </AnimatePresence>
+                </svg>
+
+                {/* Split legend — slides in below chart */}
+                <AnimatePresence>
+                  {hoveredSector !== null && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -6 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -6 }}
+                      transition={{ duration: 0.18 }}
+                    >
+                      <DonutHoverLegend>
+                        <DonutLegendRow>
+                          <DonutLegendDot $color="#10b981" />
+                          Converted ({sectors[hoveredSector].offer.conversionRate % 1 === 0 ? sectors[hoveredSector].offer.conversionRate : sectors[hoveredSector].offer.conversionRate.toFixed(1)}%)
+                        </DonutLegendRow>
+                        <DonutLegendRow>
+                          <DonutLegendDot $color={sectors[hoveredSector].color} style={{ opacity: 0.5 }} />
+                          Not converted ({(100 - sectors[hoveredSector].offer.conversionRate) % 1 === 0 ? (100 - sectors[hoveredSector].offer.conversionRate) : (100 - sectors[hoveredSector].offer.conversionRate).toFixed(1)}%)
+                        </DonutLegendRow>
+                      </DonutHoverLegend>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </OfferDonutBox>
+
+              <OfferLegendList>
+                {offers.map((offer, i) => {
+                  const share = totalImpressions > 0 ? (offer.impressions / totalImpressions) * 100 : 0;
+                  const color = DONUT_COLORS[i % DONUT_COLORS.length];
+                  const cvr = offer.conversionRate;
+                  const cvrColor = cvr >= 50 ? '#10b981' : cvr >= 20 ? '#f59e0b' : '#ef4444';
+                  return (
+                    <OfferLegendItem key={i}
+                      $active={hoveredSector === i}
+                      onMouseEnter={() => setHoveredSector(i)}
+                      onMouseLeave={() => setHoveredSector(null)}
+                    >
+                      <OfferLegendDot $color={color} />
+                      <OfferLegendName>{offer.name}</OfferLegendName>
+                      <OfferLegendRight>
+                        <OfferLegendPct>{share.toFixed(1)}%</OfferLegendPct>
+                        <OfferCvrBadge $color={cvrColor}>{cvr % 1 === 0 ? cvr : cvr.toFixed(1)}% CVR</OfferCvrBadge>
+                      </OfferLegendRight>
+                    </OfferLegendItem>
+                  );
+                })}
+              </OfferLegendList>
+            </OfferVizRow>
+          </OfferVizSection>
+        )}
 
         {offers.length > 0 && (
           <OfferTable>
@@ -325,14 +560,6 @@ export function FlowStatsPage() {
                 </PathItem>
               ))}
             </PathContainer>
-          </>
-        )}
-
-        {/* ── Flow Path Sankey ──────────────────────────────────────── */}
-        {(flow.pathDistribution ?? []).length > 0 && (
-          <>
-            <SectionTitle><GitBranch size={18} /> All User Paths</SectionTitle>
-            <FlowPathSankey paths={flow.pathDistribution!} />
           </>
         )}
 
@@ -481,45 +708,45 @@ const KpiGrid = styled.div`
 const KpiCard = styled.div<{ $index: number; $color: string }>`
   background: ${({ theme }) => theme.colors.bgSurface};
   border: 1px solid ${({ theme }) => theme.colors.border};
+  border-left: 3px solid ${({ $color }) => $color};
   border-radius: ${({ theme }) => theme.radii.md};
-  padding: 16px;
+  padding: 11px 14px;
   display: flex;
-  flex-direction: column;
-  gap: 6px;
-  position: relative;
-  overflow: hidden;
-
-  &::after {
-    content: "";
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 2px;
-    background: ${({ $color }) => $color};
-  }
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
 `;
 
 const KpiIconWrap = styled.div<{ $color: string }>`
-  width: 34px;
-  height: 34px;
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
   border-radius: ${({ theme }) => theme.radii.sm};
-  background: ${({ $color }) => `${$color}15`};
+  background: ${({ $color }) => `${$color}18`};
   display: flex;
   align-items: center;
   justify-content: center;
   color: ${({ $color }) => $color};
 `;
 
+const KpiContent = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+`;
+
 const KpiValue = styled.div`
-  font-size: ${({ theme }) => theme.typography.sizes.xl};
+  font-size: ${({ theme }) => theme.typography.sizes.lg};
   font-weight: ${({ theme }) => theme.typography.weights.bold};
   color: ${({ theme }) => theme.colors.textPrimary};
+  line-height: 1.2;
 `;
 
 const KpiLabel = styled.div`
   font-size: ${({ theme }) => theme.typography.sizes.xs};
   color: ${({ theme }) => theme.colors.textSecondary};
+  white-space: nowrap;
 `;
 
 // ── Structure (inline row) ───────────────────────────────────────────────────
@@ -553,23 +780,40 @@ const OfferKpiRow = styled.div`
   margin-bottom: 12px;
 `;
 
-const OfferKpiCard = styled.div`
+const OfferKpiCard = styled.div<{ $color: string }>`
   background: ${({ theme }) => theme.colors.bgSurface};
   border: 1px solid ${({ theme }) => theme.colors.border};
+  border-left: 3px solid ${({ $color }) => $color};
   border-radius: ${({ theme }) => theme.radii.md};
-  padding: 14px 18px;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
 `;
 
-const OfferKpiValue = styled.div`
+const OfferKpiIcon = styled.div<{ $color: string }>`
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  border-radius: ${({ theme }) => theme.radii.sm};
+  background: ${({ $color }) => `${$color}18`};
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: ${({ $color }) => $color};
+`;
+
+const OfferKpiValue = styled.div<{ $color: string }>`
   font-size: ${({ theme }) => theme.typography.sizes.lg};
   font-weight: ${({ theme }) => theme.typography.weights.bold};
-  color: ${({ theme }) => theme.colors.textPrimary};
+  color: ${({ $color }) => $color};
+  line-height: 1.2;
 `;
 
 const OfferKpiLabel = styled.div`
   font-size: ${({ theme }) => theme.typography.sizes.xs};
   color: ${({ theme }) => theme.colors.textSecondary};
-  margin-top: 2px;
+  margin-top: 1px;
 `;
 
 const OfferTable = styled.div`
@@ -954,4 +1198,183 @@ const NodeDropPctLabel = styled.span<{ $danger: boolean }>`
   color: ${({ $danger, theme }) => ($danger ? theme.colors.error : theme.colors.textSecondary)};
   flex-shrink: 0;
   min-width: 36px;
+`;
+
+// ── Session Timing ───────────────────────────────────────────────────────────
+
+const TimingGrid = styled.div`
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 4px;
+
+  @media (max-width: ${({ theme }) => theme.breakpoints.mobile}) {
+    grid-template-columns: 1fr;
+  }
+`;
+
+const TimingGroup = styled.div<{ $color: string }>`
+  background: ${({ theme }) => theme.colors.bgSurface};
+  border: 1px solid ${({ theme }) => theme.colors.border};
+  border-top: 3px solid ${({ $color }) => $color};
+  border-radius: ${({ theme }) => theme.radii.md};
+  padding: 14px 18px;
+`;
+
+const TimingGroupLabel = styled.div<{ $color: string }>`
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: ${({ theme }) => theme.typography.sizes.xs};
+  font-weight: ${({ theme }) => theme.typography.weights.semibold};
+  color: ${({ $color }) => $color};
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 12px;
+`;
+
+const TimingRow = styled.div`
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 4px;
+`;
+
+const TimingCell = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 6px 8px;
+  border-radius: ${({ theme }) => theme.radii.sm};
+  background: ${({ theme }) => theme.colors.bgElevated};
+`;
+
+const TimingValue = styled.div<{ $color: string }>`
+  font-size: ${({ theme }) => theme.typography.sizes.md};
+  font-weight: ${({ theme }) => theme.typography.weights.bold};
+  color: ${({ $color }) => $color};
+`;
+
+const TimingLabel = styled.div`
+  font-size: ${({ theme }) => theme.typography.sizes.xs};
+  color: ${({ theme }) => theme.colors.textTertiary};
+`;
+
+// ── Offer Donut Chart ────────────────────────────────────────────────────────
+
+const OfferVizSection = styled.div`
+  margin-bottom: 12px;
+`;
+
+const OfferVizRow = styled.div`
+  display: flex;
+  gap: 0;
+  background: ${({ theme }) => theme.colors.bgSurface};
+  border: 1px solid ${({ theme }) => theme.colors.border};
+  border-radius: ${({ theme }) => theme.radii.md};
+  overflow: hidden;
+`;
+
+const OfferDonutBox = styled.div`
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 20px 16px 16px;
+  border-right: 1px solid ${({ theme }) => theme.colors.border};
+`;
+
+const DonutHoverLegend = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 10px;
+`;
+
+const DonutLegendRow = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: ${({ theme }) => theme.typography.sizes.xs};
+  color: ${({ theme }) => theme.colors.textSecondary};
+`;
+
+const DonutLegendDot = styled.div<{ $color: string }>`
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: ${({ $color }) => $color};
+  flex-shrink: 0;
+`;
+
+const OfferLegendList = styled.div`
+  flex: 1;
+  overflow-y: auto;
+  max-height: 320px;
+  display: flex;
+  flex-direction: column;
+  padding: 8px;
+
+  &::-webkit-scrollbar { width: 4px; }
+  &::-webkit-scrollbar-track { background: transparent; }
+  &::-webkit-scrollbar-thumb { background: ${({ theme }) => theme.colors.border}; border-radius: 2px; }
+`;
+
+const OfferLegendItem = styled.div<{ $active: boolean }>`
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+  border-radius: ${({ theme }) => theme.radii.sm};
+  cursor: pointer;
+  background: ${({ $active, theme }) => $active ? theme.colors.bgElevated : 'transparent'};
+  border: 1px solid ${({ $active, theme }) => $active ? theme.colors.border : 'transparent'};
+  transition: background 0.15s, border-color 0.15s;
+
+  &:hover {
+    background: ${({ theme }) => theme.colors.bgElevated};
+  }
+`;
+
+const OfferLegendDot = styled.div<{ $color: string }>`
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: ${({ $color }) => $color};
+  flex-shrink: 0;
+`;
+
+const OfferLegendName = styled.div`
+  flex: 1;
+  font-size: ${({ theme }) => theme.typography.sizes.sm};
+  color: ${({ theme }) => theme.colors.textPrimary};
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+`;
+
+const OfferLegendRight = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+`;
+
+const OfferLegendPct = styled.div`
+  font-size: ${({ theme }) => theme.typography.sizes.xs};
+  font-weight: ${({ theme }) => theme.typography.weights.semibold};
+  color: ${({ theme }) => theme.colors.textSecondary};
+  min-width: 36px;
+  text-align: right;
+`;
+
+const OfferCvrBadge = styled.div<{ $color: string }>`
+  font-size: 10px;
+  font-weight: ${({ theme }) => theme.typography.weights.semibold};
+  color: ${({ $color }) => $color};
+  background: ${({ $color }) => `${$color}18`};
+  border-radius: 999px;
+  padding: 2px 7px;
+  white-space: nowrap;
 `;

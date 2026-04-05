@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import styled, { useTheme } from "styled-components";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Plus,
   LayoutGrid,
@@ -12,7 +12,10 @@ import {
   TrendingDown,
   ShoppingBag,
   AlertTriangle,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
+import { DONUT_COLORS, D_CX, D_CY, D_R, D_r, D_GAP, dSectorRaw, dSector } from "@shared/utils/donut";
 import { useNavigate } from "@tanstack/react-router";
 import { Button } from "@shared/ui/Button";
 import { Input } from "@shared/ui/Input";
@@ -36,18 +39,20 @@ import type { AppTheme } from "@shared/theme/theme";
 
 type ColorKey = "accent" | "success" | "error" | "warning" | "info";
 
-interface StatDef {
-  label: string;
-  value: string | number;
-  icon: React.ReactNode;
-  color: ColorKey;
-}
-
 export function DashboardPage() {
   const theme = useTheme() as AppTheme;
   const navigate = useNavigate();
   const [createOpen, setCreateOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
+  const [offersExpanded, setOffersExpanded] = useState(false);
+  const [dropOffsExpanded, setDropOffsExpanded] = useState(false);
+  const [hoveredFlow, setHoveredFlow] = useState<number | null>(null);
+  const [flowFilter, setFlowFilter] = useState<string | null>(null);
+  type OfferSortKey = "timesPresented" | "timesConverted" | "conversionRate" | "offerName";
+  const [offerSort, setOfferSort] = useState<OfferSortKey>("timesPresented");
+
+  const OFFERS_PREVIEW = 5;
+  const DROPOFFS_PREVIEW = 5;
 
   const { data: flows = [], isLoading, isError } = useFlows();
   const { mutate: deleteFlow } = useDeleteFlow();
@@ -57,6 +62,55 @@ export function DashboardPage() {
   const { data: sessionStats } = useGlobalSessionStats();
   const { data: offerStats } = useGlobalOfferStats();
   const { data: dropOffs } = useGlobalDropOffs();
+
+  const sortedOffers = useMemo(() => {
+    if (!offerStats) return [];
+    const base = flowFilter
+      ? offerStats.items.filter((o) => o.flowId === flowFilter)
+      : offerStats.items;
+    return [...base].sort((a, b) => {
+      if (offerSort === "offerName") return a.offerName.localeCompare(b.offerName);
+      return (b[offerSort] as number) - (a[offerSort] as number);
+    });
+  }, [offerStats, offerSort, flowFilter]);
+
+  const visibleOffers = offersExpanded ? sortedOffers : sortedOffers.slice(0, OFFERS_PREVIEW);
+  const maxPresented = sortedOffers.length > 0 ? Math.max(...sortedOffers.map(o => o.timesPresented)) : 1;
+
+  const toggleFlowFilter = (flowId: string) => {
+    setFlowFilter((prev) => (prev === flowId ? null : flowId));
+    setOffersExpanded(false);
+  };
+
+  const flowGroups = useMemo(() => {
+    if (!offerStats) return [];
+    const map: Record<string, { flowId: string; flowName: string; offers: typeof offerStats.items; totalImpressions: number }> = {};
+    for (const o of offerStats.items) {
+      if (!map[o.flowId]) map[o.flowId] = { flowId: o.flowId, flowName: o.flowName, offers: [], totalImpressions: 0 };
+      map[o.flowId].offers.push(o);
+      map[o.flowId].totalImpressions += o.timesPresented;
+    }
+    return Object.values(map).sort((a, b) => b.totalImpressions - a.totalImpressions);
+  }, [offerStats]);
+
+  const totalFlowImpressions = useMemo(() =>
+    flowGroups.reduce((sum, g) => sum + g.totalImpressions, 0),
+  [flowGroups]);
+
+  const flowSectors = useMemo(() => {
+    if (totalFlowImpressions === 0) return [];
+    let angle = -Math.PI / 2;
+    return flowGroups.map((group, i) => {
+      const span = (group.totalImpressions / totalFlowImpressions) * Math.PI * 2;
+      const start = angle;
+      angle += span;
+      return { start, end: angle, span, group, color: DONUT_COLORS[i % DONUT_COLORS.length] };
+    });
+  }, [flowGroups, totalFlowImpressions]);
+
+  const flowFilterName = flowFilter
+    ? flowGroups.find((g) => g.flowId === flowFilter)?.flowName ?? null
+    : null;
 
   const filtered = flows.filter(
     (f) =>
@@ -102,59 +156,14 @@ export function DashboardPage() {
       .then(() => toast.success("Link copied to clipboard!"));
   };
 
-  const sessionStatCards: StatDef[] = [
-    {
-      label: "Total Sessions",
-      value: sessionStats?.totalSessions ?? "—",
-      icon: <Users size={20} />,
-      color: "accent",
-    },
-    {
-      label: "In Progress",
-      value: sessionStats?.inProgress ?? "—",
-      icon: <TrendingUp size={20} />,
-      color: "info",
-    },
-    {
-      label: "Completed",
-      value: sessionStats?.completed ?? "—",
-      icon: <CheckCircle2 size={20} />,
-      color: "success",
-    },
-    {
-      label: "Abandoned",
-      value: sessionStats?.abandoned ?? "—",
-      icon: <XCircle size={20} />,
-      color: "error",
-    },
-    {
-      label: "Completion Rate",
-      value: sessionStats
-        ? `${sessionStats.completionRate.toFixed(1)}%`
-        : "—",
-      icon: <TrendingUp size={20} />,
-      color: "success",
-    },
-    {
-      label: "Abandon Rate",
-      value: sessionStats
-        ? `${sessionStats.abandonRate.toFixed(1)}%`
-        : "—",
-      icon: <TrendingDown size={20} />,
-      color: "error",
-    },
-  ];
-
-  const topDropOffs = dropOffs
-    ? [...dropOffs.items]
-        .sort((a, b) => b.dropOffRate - a.dropOffRate)
-        .slice(0, 5)
+  const allDropOffs = dropOffs
+    ? [...dropOffs.items].sort((a, b) => b.dropOffRate - a.dropOffRate)
     : [];
 
-  const maxDropOff =
-    topDropOffs.length > 0
-      ? Math.max(...topDropOffs.map((d) => d.dropOffRate))
-      : 0;
+  const topDropOffs = dropOffsExpanded
+    ? allDropOffs
+    : allDropOffs.slice(0, DROPOFFS_PREVIEW);
+
 
   return (
     <AdminLayout>
@@ -175,66 +184,177 @@ export function DashboardPage() {
           </Button>
         </PageHeader>
 
-        {/* Survey overview mini-stats */}
-        <MiniStatsRow>
-          <MiniStat
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-          >
-            <MiniStatIcon $color="accent">
-              <LayoutGrid size={16} />
-            </MiniStatIcon>
-            <div>
-              <MiniStatValue>{flows.length}</MiniStatValue>
-              <MiniStatLabel>Total Surveys</MiniStatLabel>
-            </div>
-          </MiniStat>
-          <MiniStat
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.05 }}
-          >
-            <MiniStatIcon $color="success">
-              <CheckCircle2 size={16} />
-            </MiniStatIcon>
-            <div>
-              <MiniStatValue>{published}</MiniStatValue>
-              <MiniStatLabel>Published</MiniStatLabel>
-            </div>
-          </MiniStat>
-        </MiniStatsRow>
-
-        {/* Session analytics cards */}
-        <SectionHeader>
-          <SectionTitle>Session Analytics</SectionTitle>
-        </SectionHeader>
-        <StatsGrid>
-          {sessionStatCards.map((stat, i) => (
-            <ColorStatCard
+        {/* Unified compact stats */}
+        <DashKpiGrid>
+          {[
+            { label: "Total Surveys",    value: flows.length,                                               icon: <LayoutGrid size={15} />,   color: "accent"   as ColorKey },
+            { label: "Published",        value: published,                                                  icon: <CheckCircle2 size={15} />, color: "success"  as ColorKey },
+            { label: "Total Sessions",   value: sessionStats?.totalSessions ?? "—",                         icon: <Users size={15} />,        color: "accent"   as ColorKey },
+            { label: "In Progress",      value: sessionStats?.inProgress ?? "—",                            icon: <TrendingUp size={15} />,   color: "info"     as ColorKey },
+            { label: "Completed",        value: sessionStats?.completed ?? "—",                             icon: <CheckCircle2 size={15} />, color: "success"  as ColorKey },
+            { label: "Abandoned",        value: sessionStats?.abandoned ?? "—",                             icon: <XCircle size={15} />,      color: "error"    as ColorKey },
+            { label: "Completion Rate",  value: sessionStats ? `${sessionStats.completionRate.toFixed(1)}%` : "—", icon: <TrendingUp size={15} />,   color: "success"  as ColorKey },
+            { label: "Abandon Rate",     value: sessionStats ? `${sessionStats.abandonRate.toFixed(1)}%`   : "—", icon: <TrendingDown size={15} />, color: "error"    as ColorKey },
+          ].map((stat, i) => (
+            <DashKpiCard
               key={stat.label}
               $color={stat.color}
-              initial={{ opacity: 0, y: 16 }}
+              initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: i * 0.04 }}
+              transition={{ delay: i * 0.03 }}
             >
-              <ColorStatIcon $color={stat.color}>{stat.icon}</ColorStatIcon>
-              <ColorStatValue>{stat.value}</ColorStatValue>
-              <ColorStatLabel>{stat.label}</ColorStatLabel>
-            </ColorStatCard>
+              <DashKpiIcon $color={stat.color}>{stat.icon}</DashKpiIcon>
+              <DashKpiContent>
+                <DashKpiValue>{stat.value}</DashKpiValue>
+                <DashKpiLabel>{stat.label}</DashKpiLabel>
+              </DashKpiContent>
+            </DashKpiCard>
           ))}
-        </StatsGrid>
+        </DashKpiGrid>
 
         {/* Offer stats */}
-        {offerStats && offerStats.items.length > 0 && (
+        {sortedOffers.length > 0 && (
           <>
             <SectionHeader>
-              <SectionTitle>
-                <ShoppingBag size={18} style={{ verticalAlign: "middle", marginRight: 8 }} />
-                Offer Performance
-              </SectionTitle>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+                <SectionTitle>
+                  <ShoppingBag size={18} style={{ verticalAlign: "middle", marginRight: 8 }} />
+                  Offer Performance
+                  <OfferCountBadge>{sortedOffers.length} offers</OfferCountBadge>
+                </SectionTitle>
+                <OfferSortRow>
+                  {(["timesPresented", "timesConverted", "conversionRate", "offerName"] as const).map((key) => (
+                    <OfferSortBtn
+                      key={key}
+                      $active={offerSort === key}
+                      onClick={() => { setOfferSort(key); setOffersExpanded(false); }}
+                    >
+                      {key === "timesPresented" && "Presented"}
+                      {key === "timesConverted" && "Converted"}
+                      {key === "conversionRate" && "Conv. Rate"}
+                      {key === "offerName" && "Name A–Z"}
+                    </OfferSortBtn>
+                  ))}
+                  {flowFilterName && (
+                    <OfferFlowFilterChip onClick={() => { setFlowFilter(null); setOffersExpanded(false); }}>
+                      {flowFilterName}
+                      <XCircle size={12} style={{ flexShrink: 0 }} />
+                    </OfferFlowFilterChip>
+                  )}
+                </OfferSortRow>
+              </div>
             </SectionHeader>
-            <OfferCardsGrid>
-              {offerStats.items.map((offer, i) => {
+
+            {/* Flow donut */}
+            {flowSectors.length > 0 && (
+              <DashDonutSection>
+                <DashDonutBox>
+                  <svg width={240} height={240} viewBox="0 0 240 240" style={{ overflow: 'visible' }}>
+                    {flowSectors.map((s, i) => {
+                      const isHov = hoveredFlow === i;
+                      const anyHov = hoveredFlow !== null;
+                      const span = s.end - s.start;
+                      const hg = Math.min(D_GAP / 2, span * 0.08);
+                      const a1 = s.start + hg, a2 = s.end - hg;
+
+                      // Offer sub-arcs within hovered flow
+                      let subAngle = a1;
+                      const offerSubArcs = isHov ? s.group.offers.map((o, oi) => {
+                        const offerSpan = s.group.totalImpressions > 0 ? (a2 - a1) * o.timesPresented / s.group.totalImpressions : 0;
+                        const subStart = subAngle;
+                        subAngle += offerSpan;
+                        return { start: subStart, end: subAngle, offer: o, color: DONUT_COLORS[(i * 3 + oi + 1) % DONUT_COLORS.length] };
+                      }) : [];
+
+                      return (
+                        <motion.g
+                          key={i}
+                          animate={{ opacity: anyHov && !isHov ? 0.22 : 1, scale: isHov ? 1.06 : 1 }}
+                          transition={{ duration: 0.22, ease: 'easeOut' }}
+                          style={{ transformOrigin: `${D_CX}px ${D_CY}px`, cursor: 'pointer' }}
+                          onMouseEnter={() => setHoveredFlow(i)}
+                          onMouseLeave={() => setHoveredFlow(null)}
+                          onClick={() => toggleFlowFilter(s.group.flowId)}
+                        >
+                          <motion.path
+                            d={dSector(s.start, s.end)}
+                            fill={s.color}
+                            animate={{ opacity: isHov ? 0 : 1 }}
+                            transition={{ duration: 0.18 }}
+                          />
+                          <AnimatePresence>
+                            {isHov && offerSubArcs.map((sub, oi) => (
+                              <motion.path
+                                key={oi}
+                                d={dSectorRaw(sub.start, sub.end, D_R + 6, D_r - 4)}
+                                fill={sub.color}
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                transition={{ duration: 0.2 }}
+                              />
+                            ))}
+                          </AnimatePresence>
+                        </motion.g>
+                      );
+                    })}
+
+                    <AnimatePresence mode="wait">
+                      {hoveredFlow !== null ? (() => {
+                        const g = flowSectors[hoveredFlow].group;
+                        const short = g.flowName.length > 16 ? g.flowName.slice(0, 14) + '…' : g.flowName;
+                        return (
+                          <motion.g key="hov" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
+                            <text x={D_CX} y={D_CY - 16} textAnchor="middle" fill={theme.colors.textPrimary} fontSize="10" fontWeight="600" fontFamily="inherit">{short}</text>
+                            <text x={D_CX} y={D_CY + 4}  textAnchor="middle" fill={theme.colors.accent} fontSize="20" fontWeight="700" fontFamily="inherit">{g.totalImpressions}</text>
+                            <text x={D_CX} y={D_CY + 20} textAnchor="middle" fill={theme.colors.textTertiary} fontSize="10" fontFamily="inherit">impressions</text>
+                            <text x={D_CX} y={D_CY + 34} textAnchor="middle" fill={theme.colors.textTertiary} fontSize="10" fontFamily="inherit">{g.offers.length} offer{g.offers.length !== 1 ? 's' : ''}</text>
+                          </motion.g>
+                        );
+                      })() : (
+                        <motion.g key="def" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
+                          <text x={D_CX} y={D_CY - 4}  textAnchor="middle" fill={theme.colors.textPrimary} fontSize="22" fontWeight="700" fontFamily="inherit">{totalFlowImpressions}</text>
+                          <text x={D_CX} y={D_CY + 16} textAnchor="middle" fill={theme.colors.textTertiary} fontSize="11" fontFamily="inherit">impressions</text>
+                        </motion.g>
+                      )}
+                    </AnimatePresence>
+                  </svg>
+                </DashDonutBox>
+
+                <DashFlowLegend>
+                  {flowSectors.map((s, i) => {
+                    const share = totalFlowImpressions > 0 ? (s.group.totalImpressions / totalFlowImpressions) * 100 : 0;
+                    return (
+                      <DashFlowLegendItem
+                        key={s.group.flowId}
+                        $active={hoveredFlow === i}
+                        onMouseEnter={() => setHoveredFlow(i)}
+                        onMouseLeave={() => setHoveredFlow(null)}
+                        onClick={() => toggleFlowFilter(s.group.flowId)}
+                      >
+                        <DashFlowLegendDot $color={s.color} />
+                        <DashFlowLegendName>{s.group.flowName}</DashFlowLegendName>
+                        <DashFlowLegendRight>
+                          <DashFlowLegendPct>{share.toFixed(1)}%</DashFlowLegendPct>
+                          <DashFlowLegendCount>{s.group.offers.length} offers</DashFlowLegendCount>
+                        </DashFlowLegendRight>
+                      </DashFlowLegendItem>
+                    );
+                  })}
+                </DashFlowLegend>
+              </DashDonutSection>
+            )}
+
+            <OfferTable>
+              <OfferTableHeader>
+                <OfferColName>Offer</OfferColName>
+                <OfferColFlow>Flow</OfferColFlow>
+                <OfferColStat $sortable $active={offerSort === "timesPresented"} onClick={() => { setOfferSort("timesPresented"); setOffersExpanded(false); }}>Presented</OfferColStat>
+                <OfferColStat $sortable $active={offerSort === "timesConverted"} onClick={() => { setOfferSort("timesConverted"); setOffersExpanded(false); }}>Converted</OfferColStat>
+                <OfferColBar $sortable $active={offerSort === "conversionRate"} onClick={() => { setOfferSort("conversionRate"); setOffersExpanded(false); }}>Conversion Rate</OfferColBar>
+              </OfferTableHeader>
+
+              {visibleOffers.map((offer, i) => {
                 const rate = offer.conversionRate;
                 const rateColor =
                   rate >= 50
@@ -242,106 +362,75 @@ export function DashboardPage() {
                     : rate >= 20
                       ? theme.colors.warning
                       : theme.colors.error;
+                const barWidth = maxPresented > 0 ? (offer.timesPresented / maxPresented) * 100 : 0;
                 return (
-                  <OfferCard
+                  <OfferRow
                     key={offer.offerId}
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ delay: i * 0.06 }}
-                  >
-                    <OfferCardHeader>
-                      <OfferName>{offer.offerName}</OfferName>
-                      <OfferSlug>{offer.offerSlug}</OfferSlug>
-                    </OfferCardHeader>
-                    <OfferMetrics>
-                      <OfferMetric>
-                        <OfferMetricValue>{offer.timesPresented}</OfferMetricValue>
-                        <OfferMetricLabel>Presented</OfferMetricLabel>
-                      </OfferMetric>
-                      <OfferMetric>
-                        <OfferMetricValue>{offer.timesConverted}</OfferMetricValue>
-                        <OfferMetricLabel>Converted</OfferMetricLabel>
-                      </OfferMetric>
-                      <OfferMetric>
-                        <OfferMetricValue style={{ color: rateColor }}>
-                          {rate.toFixed(1)}%
-                        </OfferMetricValue>
-                        <OfferMetricLabel>Conv. Rate</OfferMetricLabel>
-                      </OfferMetric>
-                    </OfferMetrics>
-                    <ProgressBarTrack>
-                      <ProgressBarFill
-                        style={{ width: `${Math.min(rate, 100)}%`, background: rateColor }}
-                        initial={{ width: 0 }}
-                        animate={{ width: `${Math.min(rate, 100)}%` }}
-                        transition={{ duration: 0.8, delay: i * 0.06 + 0.2 }}
-                      />
-                    </ProgressBarTrack>
-                  </OfferCard>
-                );
-              })}
-            </OfferCardsGrid>
-          </>
-        )}
-
-        {/* Drop-off analysis — top 5 worst */}
-        {topDropOffs.length > 0 && (
-          <>
-            <SectionHeader>
-              <SectionTitle>
-                <AlertTriangle size={18} style={{ verticalAlign: "middle", marginRight: 8, color: theme.colors.error }} />
-                Drop-off Hotspots
-              </SectionTitle>
-              <SectionSubtitle>Top 5 nodes where users leave</SectionSubtitle>
-            </SectionHeader>
-            <DropOffList>
-              {topDropOffs.map((item, i) => {
-                const pct = item.dropOffRate;
-                const severity =
-                  pct >= 40
-                    ? theme.colors.error
-                    : theme.colors.warning;
-                return (
-                  <DropOffRow
-                    key={item.nodeId}
-                    initial={{ opacity: 0, x: -12 }}
+                    initial={{ opacity: 0, x: -8 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: i * 0.04 }}
                   >
-                    <DropOffLeft>
-                      <DropOffRank>#{i + 1}</DropOffRank>
-                      <DropOffDot style={{ background: severity }} />
-                      <DropOffTextBlock>
-                        <DropOffNodeName>{item.nodeTitle}</DropOffNodeName>
-                        <DropOffFlowName>{item.flowTitle}</DropOffFlowName>
-                      </DropOffTextBlock>
-                      <DropOffBadge $severity={severity}>
-                        {item.sessionCount} sessions
-                      </DropOffBadge>
-                    </DropOffLeft>
-                    <DropOffBarWrapper>
-                      <DropOffBarTrack>
-                        <DropOffBar
-                          style={{ background: severity }}
-                          initial={{ width: 0 }}
-                          animate={{ width: `${Math.min(pct, 100)}%` }}
-                          transition={{ duration: 0.6, delay: i * 0.04 + 0.15 }}
-                        />
-                      </DropOffBarTrack>
-                      <DropOffRate style={{ color: severity }}>
-                        {pct.toFixed(1)}%
-                      </DropOffRate>
-                    </DropOffBarWrapper>
-                  </DropOffRow>
+                    <OfferColName>
+                      <OfferRowName>{offer.offerName}</OfferRowName>
+                      <OfferRowSlug>{offer.offerSlug}</OfferRowSlug>
+                    </OfferColName>
+                    <OfferColFlow>
+                      <OfferFlowTag>{offer.flowName}</OfferFlowTag>
+                    </OfferColFlow>
+                    <OfferColStat>
+                      <OfferStatNum>{offer.timesPresented}</OfferStatNum>
+                    </OfferColStat>
+                    <OfferColStat>
+                      <OfferStatNum>{offer.timesConverted}</OfferStatNum>
+                    </OfferColStat>
+                    <OfferColBar>
+                      <OfferBarGroup>
+                        <OfferBarTrack>
+                          <OfferBarReach
+                            style={{ width: `${barWidth}%` }}
+                            initial={{ width: 0 }}
+                            animate={{ width: `${barWidth}%` }}
+                            transition={{ duration: 0.6, delay: i * 0.04 + 0.1 }}
+                            $color={theme.colors.border}
+                          />
+                          <OfferBarConv
+                            style={{ width: `${Math.min(rate, 100)}%`, background: rateColor }}
+                            initial={{ width: 0 }}
+                            animate={{ width: `${Math.min(rate, 100)}%` }}
+                            transition={{ duration: 0.7, delay: i * 0.04 + 0.2 }}
+                          />
+                        </OfferBarTrack>
+                        <OfferRateLabel style={{ color: rateColor }}>
+                          {rate % 1 === 0 ? rate : rate.toFixed(1)}%
+                        </OfferRateLabel>
+                      </OfferBarGroup>
+                    </OfferColBar>
+                  </OfferRow>
                 );
               })}
-            </DropOffList>
+            </OfferTable>
+
+            {sortedOffers.length > OFFERS_PREVIEW && (
+              <OfferExpandBtn
+                onClick={() => setOffersExpanded((v) => !v)}
+                whileTap={{ scale: 0.97 }}
+              >
+                {offersExpanded ? (
+                  <><ChevronUp size={14} /> Show less</>
+                ) : (
+                  <><ChevronDown size={14} /> Show {sortedOffers.length - OFFERS_PREVIEW} more offers</>
+                )}
+              </OfferExpandBtn>
+            )}
           </>
         )}
 
         {/* Surveys list */}
-        <SectionHeader style={{ marginTop: 8 }}>
-          <SectionTitle>Surveys</SectionTitle>
+        <SectionHeader>
+          <SectionTitle>
+            <LayoutGrid size={18} style={{ verticalAlign: "middle", marginRight: 8 }} />
+            Surveys
+          </SectionTitle>
         </SectionHeader>
 
         <Toolbar>
@@ -409,6 +498,77 @@ export function DashboardPage() {
           </Grid>
         )}
 
+        {/* Drop-off analysis */}
+        {allDropOffs.length > 0 && (
+          <>
+            <SectionHeader>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <SectionTitle>
+                  <AlertTriangle size={18} style={{ verticalAlign: "middle", marginRight: 8, color: theme.colors.error }} />
+                  Drop-off Hotspots
+                  <OfferCountBadge>{allDropOffs.length} nodes</OfferCountBadge>
+                </SectionTitle>
+                <SectionSubtitle>Nodes where users leave most</SectionSubtitle>
+              </div>
+            </SectionHeader>
+            <DropOffList>
+              {topDropOffs.map((item, i) => {
+                const pct = item.dropOffRate;
+                const severity =
+                  pct >= 40
+                    ? theme.colors.error
+                    : theme.colors.warning;
+                return (
+                  <DropOffRow
+                    key={item.nodeId}
+                    initial={{ opacity: 0, x: -12 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: i * 0.04 }}
+                  >
+                    <DropOffLeft>
+                      <DropOffRank>#{i + 1}</DropOffRank>
+                      <DropOffDot style={{ background: severity }} />
+                      <DropOffTextBlock>
+                        <DropOffNodeName>{item.nodeTitle}</DropOffNodeName>
+                        <DropOffFlowName>{item.flowTitle}</DropOffFlowName>
+                      </DropOffTextBlock>
+                      <DropOffBadge $severity={severity}>
+                        {item.sessionCount} sessions
+                      </DropOffBadge>
+                    </DropOffLeft>
+                    <DropOffBarWrapper>
+                      <DropOffBarTrack>
+                        <DropOffBar
+                          style={{ background: severity }}
+                          initial={{ width: 0 }}
+                          animate={{ width: `${Math.min(pct, 100)}%` }}
+                          transition={{ duration: 0.6, delay: i * 0.04 + 0.15 }}
+                        />
+                      </DropOffBarTrack>
+                      <DropOffRate style={{ color: severity }}>
+                        {pct.toFixed(1)}%
+                      </DropOffRate>
+                    </DropOffBarWrapper>
+                  </DropOffRow>
+                );
+              })}
+            </DropOffList>
+
+            {allDropOffs.length > DROPOFFS_PREVIEW && (
+              <OfferExpandBtn
+                onClick={() => setDropOffsExpanded((v) => !v)}
+                whileTap={{ scale: 0.97 }}
+              >
+                {dropOffsExpanded ? (
+                  <><ChevronUp size={14} /> Show less</>
+                ) : (
+                  <><ChevronDown size={14} /> Show {allDropOffs.length - DROPOFFS_PREVIEW} more nodes</>
+                )}
+              </OfferExpandBtn>
+            )}
+          </>
+        )}
+
         <CreateSurveyModal
           open={createOpen}
           onClose={() => setCreateOpen(false)}
@@ -469,46 +629,57 @@ const PageSubtitle = styled.p`
   margin-top: 6px;
 `;
 
-/* ─── Mini Stats (surveys) ─────────────────────────────────────────── */
+/* ─── Unified compact KPI grid ─────────────────────────────────────── */
 
-const MiniStatsRow = styled.div`
-  display: flex;
-  gap: 12px;
-  margin-bottom: 32px;
+const DashKpiGrid = styled.div`
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin-bottom: 28px;
 `;
 
-const MiniStat = styled(motion.div)`
-  display: flex;
-  align-items: center;
-  gap: 12px;
+const DashKpiCard = styled(motion.div)<{ $color: ColorKey }>`
   background: ${({ theme }) => theme.colors.bgSurface};
   border: 1px solid ${({ theme }) => theme.colors.border};
-  border-radius: ${({ theme }) => theme.radii.lg};
-  padding: 14px 20px;
+  border-left: 3px solid ${({ theme, $color }) => colorMap(theme, $color).fg};
+  border-radius: ${({ theme }) => theme.radii.md};
+  padding: 11px 14px;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
 `;
 
-const MiniStatIcon = styled.div<{ $color: ColorKey }>`
-  width: 36px;
-  height: 36px;
-  border-radius: ${({ theme }) => theme.radii.md};
+const DashKpiIcon = styled.div<{ $color: ColorKey }>`
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  border-radius: ${({ theme }) => theme.radii.sm};
+  background: ${({ theme, $color }) => colorMap(theme, $color).bg};
   display: flex;
   align-items: center;
   justify-content: center;
-  background: ${({ theme, $color }) => colorMap(theme, $color).bg};
   color: ${({ theme, $color }) => colorMap(theme, $color).fg};
 `;
 
-const MiniStatValue = styled.div`
-  font-size: ${({ theme }) => theme.typography.sizes.xl};
-  font-weight: ${({ theme }) => theme.typography.weights.bold};
-  color: ${({ theme }) => theme.colors.textPrimary};
-  line-height: 1;
+const DashKpiContent = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
 `;
 
-const MiniStatLabel = styled.div`
+const DashKpiValue = styled.div`
+  font-size: ${({ theme }) => theme.typography.sizes.lg};
+  font-weight: ${({ theme }) => theme.typography.weights.bold};
+  color: ${({ theme }) => theme.colors.textPrimary};
+  line-height: 1.2;
+`;
+
+const DashKpiLabel = styled.div`
   font-size: ${({ theme }) => theme.typography.sizes.xs};
   color: ${({ theme }) => theme.colors.textSecondary};
-  margin-top: 2px;
+  white-space: nowrap;
 `;
 
 /* ─── Section Headers ──────────────────────────────────────────────── */
@@ -532,144 +703,316 @@ const SectionSubtitle = styled.p`
   margin-top: 2px;
 `;
 
-/* ─── Session Stats Grid ───────────────────────────────────────────── */
+/* ─── Dashboard Donut ──────────────────────────────────────────────── */
 
-const StatsGrid = styled.div`
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-  gap: 14px;
-  margin-bottom: 36px;
-`;
-
-const ColorStatCard = styled(motion.div)<{ $color: ColorKey }>`
-  position: relative;
-  background: ${({ theme }) => theme.colors.bgSurface};
-  border: 1px solid ${({ theme }) => theme.colors.border};
-  border-radius: ${({ theme }) => theme.radii.lg};
-  padding: 20px;
-  overflow: hidden;
-  transition: box-shadow ${({ theme }) => theme.transitions.fast},
-    border-color ${({ theme }) => theme.transitions.fast};
-
-  &::before {
-    content: "";
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: 3px;
-    background: ${({ theme, $color }) => colorMap(theme, $color).fg};
-    border-radius: ${({ theme }) => theme.radii.lg} ${({ theme }) => theme.radii.lg} 0 0;
-  }
-
-  &:hover {
-    border-color: ${({ theme, $color }) => colorMap(theme, $color).fg};
-    box-shadow: 0 4px 16px ${({ theme, $color }) => colorMap(theme, $color).fg}22;
-  }
-`;
-
-const ColorStatIcon = styled.div<{ $color: ColorKey }>`
-  width: 40px;
-  height: 40px;
-  border-radius: ${({ theme }) => theme.radii.md};
+const DashDonutSection = styled.div`
   display: flex;
   align-items: center;
-  justify-content: center;
-  background: ${({ theme, $color }) => colorMap(theme, $color).bg};
-  color: ${({ theme, $color }) => colorMap(theme, $color).fg};
-  margin-bottom: 14px;
+  gap: 24px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
 `;
 
-const ColorStatValue = styled.div`
-  font-size: ${({ theme }) => theme.typography.sizes.xxl};
-  font-weight: ${({ theme }) => theme.typography.weights.bold};
+const DashDonutBox = styled.div`
+  flex-shrink: 0;
+`;
+
+const DashFlowLegend = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+  min-width: 180px;
+`;
+
+const DashFlowLegendItem = styled.div<{ $active: boolean }>`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-radius: ${({ theme }) => theme.radii.md};
+  background: ${({ theme, $active }) => $active ? theme.colors.bgElevated : 'transparent'};
+  cursor: pointer;
+  transition: background ${({ theme }) => theme.transitions.fast};
+`;
+
+const DashFlowLegendDot = styled.div<{ $color: string }>`
+  width: 10px;
+  height: 10px;
+  border-radius: ${({ theme }) => theme.radii.full};
+  background: ${({ $color }) => $color};
+  flex-shrink: 0;
+`;
+
+const DashFlowLegendName = styled.div`
+  font-size: ${({ theme }) => theme.typography.sizes.sm};
   color: ${({ theme }) => theme.colors.textPrimary};
-  line-height: 1;
+  font-weight: ${({ theme }) => theme.typography.weights.medium};
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 `;
 
-const ColorStatLabel = styled.div`
+const DashFlowLegendRight = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+`;
+
+const DashFlowLegendPct = styled.div`
   font-size: ${({ theme }) => theme.typography.sizes.xs};
   color: ${({ theme }) => theme.colors.textSecondary};
-  margin-top: 6px;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
   font-weight: ${({ theme }) => theme.typography.weights.medium};
 `;
 
-/* ─── Offer Cards ──────────────────────────────────────────────────── */
-
-const OfferCardsGrid = styled.div`
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 16px;
-  margin-bottom: 36px;
+const DashFlowLegendCount = styled.div`
+  font-size: ${({ theme }) => theme.typography.sizes.xs};
+  color: ${({ theme }) => theme.colors.textTertiary};
 `;
 
-const OfferCard = styled(motion.div)`
+/* ─── Offer Table ──────────────────────────────────────────────────── */
+
+const OfferCountBadge = styled.span`
+  font-size: ${({ theme }) => theme.typography.sizes.xs};
+  font-weight: ${({ theme }) => theme.typography.weights.medium};
+  color: ${({ theme }) => theme.colors.textSecondary};
+  background: ${({ theme }) => theme.colors.bgElevated};
+  border: 1px solid ${({ theme }) => theme.colors.border};
+  border-radius: ${({ theme }) => theme.radii.full};
+  padding: 2px 8px;
+  margin-left: 10px;
+  vertical-align: middle;
+`;
+
+const OfferTable = styled.div`
   background: ${({ theme }) => theme.colors.bgSurface};
   border: 1px solid ${({ theme }) => theme.colors.border};
   border-radius: ${({ theme }) => theme.radii.lg};
-  padding: 20px;
-  display: flex;
-  flex-direction: column;
-  transition: box-shadow ${({ theme }) => theme.transitions.fast};
+  overflow: hidden;
+  margin-bottom: 8px;
+`;
+
+const offerRowBase = `
+  display: grid;
+  grid-template-columns: 2fr 1.4fr 90px 90px 1fr;
+  align-items: center;
+  gap: 12px;
+  padding: 0 18px;
+`;
+
+const OfferTableHeader = styled.div`
+  ${offerRowBase}
+  padding-top: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid ${({ theme }) => theme.colors.border};
+  background: ${({ theme }) => theme.colors.bgElevated};
+`;
+
+const OfferRow = styled(motion.div)`
+  ${offerRowBase}
+  padding-top: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid ${({ theme }) => theme.colors.border};
+  transition: background ${({ theme }) => theme.transitions.fast};
+
+  &:last-child {
+    border-bottom: none;
+  }
 
   &:hover {
-    box-shadow: ${({ theme }) => theme.shadows.md};
+    background: ${({ theme }) => theme.colors.bgElevated};
   }
 `;
 
-const OfferCardHeader = styled.div`
-  margin-bottom: 16px;
-  flex: 1;
+const headerCellBase = `
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 `;
 
-const OfferName = styled.div`
-  font-size: ${({ theme }) => theme.typography.sizes.md};
-  font-weight: ${({ theme }) => theme.typography.weights.semibold};
+const OfferColName = styled.div`
+  ${headerCellBase}
+  color: ${({ theme }) => theme.colors.textTertiary};
+  min-width: 0;
+`;
+
+const OfferColFlow = styled.div`
+  ${headerCellBase}
+  color: ${({ theme }) => theme.colors.textTertiary};
+  min-width: 0;
+`;
+
+const OfferColStat = styled.div<{ $sortable?: boolean; $active?: boolean }>`
+  ${headerCellBase}
+  color: ${({ theme, $active }) => $active ? theme.colors.accent : theme.colors.textTertiary};
+  text-align: center;
+  cursor: ${({ $sortable }) => $sortable ? "pointer" : "default"};
+  user-select: none;
+  transition: color ${({ theme }) => theme.transitions.fast};
+  &:hover { color: ${({ theme, $sortable }) => $sortable ? theme.colors.textPrimary : undefined}; }
+`;
+
+const OfferColBar = styled.div<{ $sortable?: boolean; $active?: boolean }>`
+  ${headerCellBase}
+  color: ${({ theme, $active }) => $active ? theme.colors.accent : theme.colors.textTertiary};
+  cursor: ${({ $sortable }) => $sortable ? "pointer" : "default"};
+  user-select: none;
+  transition: color ${({ theme }) => theme.transitions.fast};
+  &:hover { color: ${({ theme, $sortable }) => $sortable ? theme.colors.textPrimary : undefined}; }
+`;
+
+const OfferSortRow = styled.div`
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+`;
+
+const OfferSortBtn = styled.button<{ $active: boolean }>`
+  font-size: ${({ theme }) => theme.typography.sizes.xs};
+  font-weight: ${({ theme }) => theme.typography.weights.medium};
+  padding: 4px 10px;
+  border-radius: ${({ theme }) => theme.radii.full};
+  border: 1px solid ${({ theme, $active }) => $active ? theme.colors.accent : theme.colors.border};
+  background: ${({ theme, $active }) => $active ? theme.colors.accentLight : "transparent"};
+  color: ${({ theme, $active }) => $active ? theme.colors.accent : theme.colors.textSecondary};
+  cursor: pointer;
+  transition: all ${({ theme }) => theme.transitions.fast};
+  &:hover {
+    border-color: ${({ theme }) => theme.colors.accent};
+    color: ${({ theme }) => theme.colors.accent};
+  }
+`;
+
+const OfferFlowFilterChip = styled.button`
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: ${({ theme }) => theme.typography.sizes.xs};
+  font-weight: ${({ theme }) => theme.typography.weights.medium};
+  padding: 4px 10px;
+  border-radius: ${({ theme }) => theme.radii.full};
+  border: 1px solid ${({ theme }) => theme.colors.accent};
+  background: ${({ theme }) => theme.colors.accentLight};
+  color: ${({ theme }) => theme.colors.accent};
+  cursor: pointer;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  transition: all ${({ theme }) => theme.transitions.fast};
+  &:hover {
+    background: ${({ theme }) => theme.colors.accent};
+    color: #fff;
+  }
+`;
+
+const OfferRowName = styled.div`
+  font-size: ${({ theme }) => theme.typography.sizes.sm};
+  font-weight: ${({ theme }) => theme.typography.weights.medium};
   color: ${({ theme }) => theme.colors.textPrimary};
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 `;
 
-const OfferSlug = styled.div`
+const OfferRowSlug = styled.div`
   font-size: ${({ theme }) => theme.typography.sizes.xs};
   color: ${({ theme }) => theme.colors.textTertiary};
-  margin-top: 2px;
   font-family: monospace;
+  margin-top: 1px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 `;
 
-const OfferMetrics = styled.div`
-  display: flex;
-  gap: 20px;
-  margin-bottom: 14px;
-`;
-
-const OfferMetric = styled.div`
-  flex: 1;
-`;
-
-const OfferMetricValue = styled.div`
-  font-size: ${({ theme }) => theme.typography.sizes.lg};
-  font-weight: ${({ theme }) => theme.typography.weights.bold};
-  color: ${({ theme }) => theme.colors.textPrimary};
-`;
-
-const OfferMetricLabel = styled.div`
+const OfferFlowTag = styled.div`
   font-size: ${({ theme }) => theme.typography.sizes.xs};
-  color: ${({ theme }) => theme.colors.textSecondary};
-  margin-top: 2px;
+  color: ${({ theme }) => theme.colors.accent};
+  background: ${({ theme }) => theme.colors.accentLight};
+  border-radius: ${({ theme }) => theme.radii.full};
+  padding: 2px 8px;
+  display: inline-block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
+  font-weight: ${({ theme }) => theme.typography.weights.medium};
 `;
 
-const ProgressBarTrack = styled.div`
-  width: 100%;
-  height: 6px;
+const OfferStatNum = styled.div`
+  font-size: ${({ theme }) => theme.typography.sizes.sm};
+  font-weight: ${({ theme }) => theme.typography.weights.semibold};
+  color: ${({ theme }) => theme.colors.textPrimary};
+  text-align: center;
+`;
+
+const OfferBarGroup = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+`;
+
+const OfferBarTrack = styled.div`
+  flex: 1;
+  height: 8px;
   background: ${({ theme }) => theme.colors.bgElevated};
   border-radius: ${({ theme }) => theme.radii.full};
   overflow: hidden;
+  position: relative;
 `;
 
-const ProgressBarFill = styled(motion.div)`
+const OfferBarReach = styled(motion.div)<{ $color: string }>`
+  position: absolute;
+  top: 0;
+  left: 0;
   height: 100%;
   border-radius: ${({ theme }) => theme.radii.full};
+  background: ${({ $color }) => $color};
+  opacity: 0.35;
+`;
+
+const OfferBarConv = styled(motion.div)`
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  border-radius: ${({ theme }) => theme.radii.full};
+`;
+
+const OfferRateLabel = styled.span`
+  font-size: ${({ theme }) => theme.typography.sizes.sm};
+  font-weight: ${({ theme }) => theme.typography.weights.bold};
+  min-width: 42px;
+  text-align: right;
+  flex-shrink: 0;
+`;
+
+const OfferExpandBtn = styled(motion.button)`
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: ${({ theme }) => theme.typography.sizes.sm};
+  font-weight: ${({ theme }) => theme.typography.weights.medium};
+  color: ${({ theme }) => theme.colors.textSecondary};
+  background: ${({ theme }) => theme.colors.bgSurface};
+  border: 1px solid ${({ theme }) => theme.colors.border};
+  border-radius: ${({ theme }) => theme.radii.md};
+  padding: 8px 16px;
+  cursor: pointer;
+  width: 100%;
+  justify-content: center;
+  margin-bottom: 16px;
+  transition: background ${({ theme }) => theme.transitions.fast},
+    color ${({ theme }) => theme.transitions.fast};
+
+  &:hover {
+    background: ${({ theme }) => theme.colors.bgElevated};
+    color: ${({ theme }) => theme.colors.textPrimary};
+  }
 `;
 
 /* ─── Drop-off Analysis ────────────────────────────────────────────── */
@@ -678,7 +1021,7 @@ const DropOffList = styled.div`
   display: flex;
   flex-direction: column;
   gap: 8px;
-  margin-bottom: 36px;
+  margin-bottom: 8px;
 `;
 
 const DropOffRow = styled(motion.div)`
@@ -789,7 +1132,7 @@ const Toolbar = styled.div`
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-bottom: 24px;
+  margin-bottom: 12px;
   flex-wrap: wrap;
 `;
 
@@ -803,7 +1146,8 @@ const SearchWrapper = styled.div`
 const Grid = styled.div`
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-  gap: 16px;
+  gap: 10px;
+  margin-bottom: 32px;
 `;
 
 const EmptyState = styled(motion.div)`

@@ -26,8 +26,18 @@ interface SankeyLink {
   thickness: number
 }
 
+interface NodeStat {
+  answerCount: number
+  droppedOffCount: number
+  offerImpressions?: number
+  offerConversions?: number
+  offerConversionRate?: number
+  avgAnswerDuration?: string | null
+}
+
 interface Props {
   paths: FlowPathDto[]
+  nodeStatsMap?: Record<string, NodeStat>
 }
 
 // ─── Layout constants ───────────────────────────────────────────────────────
@@ -42,6 +52,20 @@ const PADDING_X = 24
 const PADDING_Y = 24
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
+
+function formatDuration(raw: string | null | undefined): string | null {
+  if (!raw) return null
+  const parts = raw.split(':')
+  if (parts.length < 3) return null
+  const h = parseInt(parts[0], 10)
+  const m = parseInt(parts[1], 10)
+  const s = parseFloat(parts[2])
+  const total = h * 3600 + m * 60 + s
+  if (total === 0) return null
+  if (h > 0) return `${h}h ${m}m ${Math.round(s)}s`
+  if (m > 0) return `${m}m ${Math.round(s)}s`
+  return `${s < 10 ? s.toFixed(1) : Math.round(s)}s`
+}
 
 function nodeTypeColor(type: string, theme: any): string {
   switch (type) {
@@ -197,7 +221,7 @@ function linkPath(
 
 // ─── Component ──────────────────────────────────────────────────────────────
 
-export function FlowPathSankey({ paths }: Props) {
+export function FlowPathSankey({ paths, nodeStatsMap }: Props) {
   const theme = useTheme()
   const [hoveredLink, setHoveredLink] = useState<string | null>(null)
   const [hoveredNode, setHoveredNode] = useState<string | null>(null)
@@ -372,7 +396,7 @@ export function FlowPathSankey({ paths }: Props) {
 
       {/* Hovered link tooltip */}
       <AnimatePresence>
-        {hoveredLink && (() => {
+        {hoveredLink && !hoveredNode && (() => {
           const link = links.find(
             (l) => `${l.sourceStep}:${l.sourceId}->${l.targetStep}:${l.targetId}` === hoveredLink
           )
@@ -381,7 +405,7 @@ export function FlowPathSankey({ paths }: Props) {
           const targetNode = nodes.find((n) => n.id === `${link.targetStep}:${link.targetId}`)
           return (
             <Tooltip
-              key="tooltip"
+              key="link-tooltip"
               initial={{ opacity: 0, y: 4 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: 4 }}
@@ -399,6 +423,88 @@ export function FlowPathSankey({ paths }: Props) {
                 )}
               </TooltipRow>
             </Tooltip>
+          )
+        })()}
+
+        {/* Hovered node stats panel */}
+        {hoveredNode && (() => {
+          const node = nodes.find((n) => n.id === hoveredNode)
+          if (!node) return null
+          const nodeId = node.id.split(':')[1] // strip "stepIndex:" prefix
+          const ns = nodeStatsMap?.[nodeId]
+          const color = nodeTypeColor(node.type, theme)
+          const total = ns ? ns.answerCount + ns.droppedOffCount : 0
+          const dropPct = total > 0 ? (ns!.droppedOffCount / total) * 100 : 0
+          return (
+            <NodePanel
+              key="node-panel"
+              initial={{ opacity: 0, x: -8 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -8 }}
+            >
+              <NodePanelHeader>
+                <NodePanelDot $color={color} />
+                <NodePanelTitle>{node.title}</NodePanelTitle>
+              </NodePanelHeader>
+              <NodePanelBadge $color={color}>{node.type}</NodePanelBadge>
+              <NodePanelDivider />
+              <NodePanelStat>
+                <NodePanelStatLabel>Reach</NodePanelStatLabel>
+                <NodePanelStatVal>{node.totalCount}</NodePanelStatVal>
+              </NodePanelStat>
+              {ns && (
+                <>
+                  {node.type !== 'Offer' && (
+                    <>
+                      <NodePanelStat>
+                        <NodePanelStatLabel>Responses</NodePanelStatLabel>
+                        <NodePanelStatVal>{ns.answerCount}</NodePanelStatVal>
+                      </NodePanelStat>
+                      <NodePanelStat>
+                        <NodePanelStatLabel>Drop-offs</NodePanelStatLabel>
+                        <NodePanelStatVal $danger={dropPct > 40}>{ns.droppedOffCount}</NodePanelStatVal>
+                      </NodePanelStat>
+                      {total > 0 && (
+                        <NodePanelBarWrap>
+                          <NodePanelBarTrack>
+                            <NodePanelBarFill style={{ width: `${dropPct}%`, background: dropPct > 40 ? theme.colors.error : theme.colors.warning }} />
+                          </NodePanelBarTrack>
+                          <NodePanelBarLabel $danger={dropPct > 40}>{dropPct.toFixed(1)}%</NodePanelBarLabel>
+                        </NodePanelBarWrap>
+                      )}
+                      {formatDuration(ns.avgAnswerDuration) && (
+                        <>
+                          <NodePanelDivider />
+                          <NodePanelStat>
+                            <NodePanelStatLabel>Avg answer time</NodePanelStatLabel>
+                            <NodePanelStatVal>{formatDuration(ns.avgAnswerDuration)}</NodePanelStatVal>
+                          </NodePanelStat>
+                        </>
+                      )}
+                    </>
+                  )}
+                  {node.type === 'Offer' && ns.offerImpressions !== undefined && (
+                    <>
+                      <NodePanelStat>
+                        <NodePanelStatLabel>Impressions</NodePanelStatLabel>
+                        <NodePanelStatVal>{ns.offerImpressions}</NodePanelStatVal>
+                      </NodePanelStat>
+                      <NodePanelStat>
+                        <NodePanelStatLabel>Conversions</NodePanelStatLabel>
+                        <NodePanelStatVal>{ns.offerConversions ?? 0}</NodePanelStatVal>
+                      </NodePanelStat>
+                      <NodePanelStat>
+                        <NodePanelStatLabel>Conv. Rate</NodePanelStatLabel>
+                        <NodePanelStatVal>{(ns.offerConversionRate ?? 0).toFixed(1)}%</NodePanelStatVal>
+                      </NodePanelStat>
+                    </>
+                  )}
+                </>
+              )}
+              {!ns && (
+                <NodePanelMuted>No stats recorded</NodePanelMuted>
+              )}
+            </NodePanel>
           )
         })()}
       </AnimatePresence>
@@ -511,4 +617,116 @@ const TooltipLabel = styled.span`
 const TooltipPct = styled.span`
   color: ${({ theme }) => theme.colors.textTertiary};
   margin-left: 4px;
+`
+
+// ── Node Stats Panel ─────────────────────────────────────────────────────────
+
+const NodePanel = styled(motion.div)`
+  position: absolute;
+  bottom: 12px;
+  left: 20px;
+  background: ${({ theme }) => theme.colors.bgElevated};
+  border: 1px solid ${({ theme }) => theme.colors.border};
+  border-radius: ${({ theme }) => theme.radii.sm};
+  padding: 12px 14px;
+  font-size: ${({ theme }) => theme.typography.sizes.xs};
+  color: ${({ theme }) => theme.colors.textPrimary};
+  box-shadow: ${({ theme }) => theme.shadows.md};
+  pointer-events: none;
+  z-index: 10;
+  min-width: 160px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+`
+
+const NodePanelHeader = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 2px;
+`
+
+const NodePanelDot = styled.div<{ $color: string }>`
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: ${({ $color }) => $color};
+  flex-shrink: 0;
+`
+
+const NodePanelTitle = styled.div`
+  font-size: ${({ theme }) => theme.typography.sizes.xs};
+  font-weight: ${({ theme }) => theme.typography.weights.semibold};
+  color: ${({ theme }) => theme.colors.textPrimary};
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 130px;
+`
+
+const NodePanelBadge = styled.div<{ $color: string }>`
+  display: inline-flex;
+  width: fit-content;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: ${({ $color }) => `${$color}20`};
+  color: ${({ $color }) => $color};
+  font-size: 10px;
+  font-weight: 600;
+`
+
+const NodePanelDivider = styled.div`
+  height: 1px;
+  background: ${({ theme }) => theme.colors.border};
+  margin: 2px 0;
+`
+
+const NodePanelStat = styled.div`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+`
+
+const NodePanelStatLabel = styled.span`
+  color: ${({ theme }) => theme.colors.textTertiary};
+`
+
+const NodePanelStatVal = styled.span<{ $danger?: boolean }>`
+  font-weight: ${({ theme }) => theme.typography.weights.semibold};
+  color: ${({ $danger, theme }) => $danger ? theme.colors.error : theme.colors.textPrimary};
+`
+
+const NodePanelBarWrap = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+`
+
+const NodePanelBarTrack = styled.div`
+  flex: 1;
+  height: 5px;
+  background: ${({ theme }) => theme.colors.bgSurface};
+  border-radius: 3px;
+  overflow: hidden;
+`
+
+const NodePanelBarFill = styled.div`
+  height: 100%;
+  border-radius: 3px;
+  transition: width 0.3s ease;
+`
+
+const NodePanelBarLabel = styled.span<{ $danger: boolean }>`
+  font-size: 10px;
+  font-weight: 600;
+  color: ${({ $danger, theme }) => $danger ? theme.colors.error : theme.colors.warning};
+  flex-shrink: 0;
+`
+
+const NodePanelMuted = styled.div`
+  color: ${({ theme }) => theme.colors.textTertiary};
+  font-style: italic;
 `

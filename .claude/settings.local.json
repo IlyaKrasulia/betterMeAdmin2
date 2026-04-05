@@ -15,7 +15,8 @@
       "Bash(find \"C:\\\\Users\\\\produ\\\\Downloads\\\\admin-app-BetterMe-main \\(3\\)\\\\admin-app-BetterMe-main/src\" -type f \\\\\\( -name \"*.tsx\" -o -name \"*.ts\" \\\\\\))",
       "Bash(find \"C:\\\\Users\\\\produ\\\\Downloads\\\\admin-app-BetterMe-main \\(3\\)\\\\admin-app-BetterMe-main/src/features/survey-client\" -type f)",
       "Bash(npx vite:*)",
-      "Bash(find /c/Users/produ/Downloads/betterMeAdmin2/src -type f \\\\\\(-name *.tsx -o -name *.ts \\\\\\))"
+      "Bash(find /c/Users/produ/Downloads/betterMeAdmin2/src -type f \\\\\\(-name *.tsx -o -name *.ts \\\\\\))",
+      "Bash(find /c/Users/produ/Downloads/betterMeAdmin2/src -type f \\\\\\(-name *tats* -o -name *Stat* \\\\\\))"
     ]
   }
 }
