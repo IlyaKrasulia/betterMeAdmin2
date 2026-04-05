@@ -1,7 +1,7 @@
 {
   "rewrites": [
     {
-      "source": "/(.*)",
+      "source": "/api/:path*",
       "destination": "https://hackaton-task-b8310a937f5.herokuapp.com/api/:path*"
     }
   ]
