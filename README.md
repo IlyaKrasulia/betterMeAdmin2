@@ -16,6 +16,10 @@ FRONTEND DEPLOY - [here](https://better-me-admin2-lzwt.vercel.app/login)
 
 BACKEND REPO - [here](https://github.com/ProdunVladyslav/Hackaton_INT20_26_Task)
 
+AI DEMO - [here](https://www.youtube.com/watch?v=cMJUmX57-AE)
+
+STATS DEMO - [here](https://www.youtube.com/watch?v=p3VSdWqglmk)
+
 ## Table of Contents
 
 1. [Pages](#pages)
