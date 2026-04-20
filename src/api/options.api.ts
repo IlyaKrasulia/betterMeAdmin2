@@ -12,7 +12,7 @@ export const optionsApi = {
   createOption: async (nodeId: string, data: CreateOptionRequest): Promise<OptionDetail> => {
     const response = await apiClient.post<OptionDetail>(
       `/api/admin/nodes/${nodeId}/options`,
-      data
+      data,
     )
     return response.data
   },
@@ -21,11 +21,11 @@ export const optionsApi = {
   updateOption: async (
     nodeId: string,
     optionId: string,
-    data: UpdateOptionRequest
+    data: UpdateOptionRequest,
   ): Promise<OptionDetail> => {
     const response = await apiClient.put<OptionDetail>(
       `/api/admin/nodes/${nodeId}/options/${optionId}`,
-      data
+      data,
     )
     return response.data
   },
@@ -33,7 +33,7 @@ export const optionsApi = {
   // DELETE /api/admin/nodes/{nodeId}/options/{optionId}
   deleteOption: async (nodeId: string, optionId: string): Promise<MessageResponse> => {
     const response = await apiClient.delete<MessageResponse>(
-      `/api/admin/nodes/${nodeId}/options/${optionId}`
+      `/api/admin/nodes/${nodeId}/options/${optionId}`,
     )
     return response.data
   },
@@ -41,11 +41,11 @@ export const optionsApi = {
   // PUT /api/admin/nodes/{nodeId}/options/reorder
   reorderOptions: async (
     nodeId: string,
-    data: ReorderOptionsRequest
+    data: ReorderOptionsRequest,
   ): Promise<MessageResponse> => {
     const response = await apiClient.put<MessageResponse>(
       `/api/admin/nodes/${nodeId}/options/reorder`,
-      data
+      data,
     )
     return response.data
   },

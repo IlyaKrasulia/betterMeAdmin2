@@ -1,9 +1,21 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
-import styled, { createGlobalStyle } from 'styled-components'
+import styled from 'styled-components'
 import { motion, AnimatePresence } from 'framer-motion'
+import {
+  SurveyPageGlobal,
+  PageShell,
+  TopBar,
+  BrandCenter,
+  BackBtn,
+  ProgressTrack,
+  ProgressFill,
+  ContentArea,
+  SurveyCard,
+} from '@features/survey-client/SurveyLayout'
 import { useParams, useNavigate } from '@tanstack/react-router'
 import { ArrowLeft, CheckCircle2 } from 'lucide-react'
-import { NodeType, AnswerType } from '@shared/types/dag.types'
+import { RoutlyLogo } from '@shared/ui/RoutlyLogo'
+import { NodeType, AnswerType, ValueKind } from '@shared/types/dag.types'
 import type { QuestionNodeData, InfoNodeData, OfferNodeData } from '@shared/types/dag.types'
 import type { SessionCurrentNode, SessionNodeOffer } from '@shared/types/api.types'
 import {
@@ -15,6 +27,8 @@ import {
 import { QuestionStep } from '@features/survey-client/components/QuestionStep'
 import { InfoStep } from '@features/survey-client/components/InfoStep'
 import { OfferStep } from '@features/survey-client/components/OfferStep'
+import { RedirectStep } from '@features/survey-client/components/RedirectStep'
+import { LeadCaptureStep } from '@features/survey-client/components/LeadCaptureStep'
 import { Button } from '@shared/ui/Button'
 import { Spinner } from '@shared/ui/Spinner'
 
@@ -47,15 +61,17 @@ function sessionNodeToQuestion(node: SessionCurrentNode): QuestionNodeData & { m
 
   return {
     type: NodeType.Question,
-    questionText: node.title ?? '',
-    attribute: (node.attributeKey ?? 'goal') as QuestionNodeData['attribute'],
+    title: node.title ?? '',
+    attributeKey: node.attributeKey ?? 'goal',
     answerType,
+    valueKind: ValueKind.Text,
     options: (node.options ?? []).map((o) => ({
       id: o.id,
       label: o.label,
       value: o.value,
+      scoreDelta: 0,
     })),
-    mediaUrl: node.mediaUrl,
+    mediaUrl: node.mediaUrl ?? undefined,
     min,
     max,
   }
@@ -66,7 +82,7 @@ function sessionNodeToInfo(node: SessionCurrentNode): InfoNodeData {
     type: NodeType.Info,
     title: node.title ?? '',
     body: node.description ?? '',
-    imageUrl: node.mediaUrl ?? undefined,
+    mediaUrl: node.mediaUrl ?? undefined,
   }
 }
 
@@ -89,12 +105,13 @@ function sessionNodeToOffer(
 
   return {
     type: NodeType.Offer,
+    name: primary?.name ?? 'Special Offer',
     headline: node.title ?? (primary?.name ?? 'Special Offer'),
-    description: primary?.description || node.description || '',
+    body: primary?.body ?? node.description ?? '',
     ctaText,
-    price: primary?.price ?? undefined,
-    kitName: primary?.physicalWellnessKitName ?? undefined,
-    kitContents: primary?.physicalWellnessKitItems ?? undefined,
+    ctaUrl: primary?.ctaUrl ?? undefined,
+    calendarUrl: primary?.calendarUrl ?? undefined,
+    imageUrl: primary?.imageUrl ?? undefined,
     offers,
   }
 }
@@ -257,6 +274,34 @@ export function SurveyPage() {
     [sessionId, recordConversion]
   )
 
+  // ─── Lead capture submit ───────────────────────────────────────────────────
+
+  const handleLeadCapture = useCallback(
+    async (values: Record<string, string>) => {
+      if (!sessionId || !currentNode) return
+      try {
+        const resp = await submitAnswer({
+          sessionId,
+          data: { nodeId: currentNode.id, value: '', leadFields: values },
+        })
+        const newStepCount = stepCount + 1
+        setDirection(1)
+        setCurrentNode(resp.currentNode)
+        setStepCount(newStepCount)
+        setCanGoBack(true)
+        if (resp.status === 'Completed') {
+          setProgressPct(100)
+          setPageState('completed')
+        } else {
+          setProgressPct(calculateProgress(newStepCount))
+        }
+      } catch {
+        // Non-fatal
+      }
+    },
+    [sessionId, currentNode, submitAnswer, stepCount]
+  )
+
   // ─── Loading / error / empty states ───────────────────────────────────────
 
   if (pageState === 'loading') {
@@ -302,7 +347,8 @@ export function SurveyPage() {
 
   // ─── Determine if we should show the offer / completion screen ─────────
   const isOffer = currentNode.type === 'Offer' && pageState === 'completed'
-  const showCompletionOnly = pageState === 'completed' && currentNode.type !== 'Offer'
+  const isRedirect = currentNode.type === 'Redirect'
+  const showCompletionOnly = pageState === 'completed' && currentNode.type !== 'Offer' && currentNode.type !== 'Redirect'
 
   // ─── Render ────────────────────────────────────────────────────────────────
 
@@ -319,9 +365,11 @@ export function SurveyPage() {
         >
           <ArrowLeft size={18} />
         </BackBtn>
-        <BrandName>🌿 Wellness Survey</BrandName>
-        {/* spacer to centre the title */}
-        <div style={{ width: 32 }} />
+        <BrandCenter>
+          <RoutlyLogo size="sm" glow />
+        </BrandCenter>
+        {/* spacer balances the back button so brand stays centered */}
+        <div style={{ width: 32, flexShrink: 0 }} />
       </TopBar>
 
       {/* ─── Progress bar ────────────────────────────────────────────── */}
@@ -337,7 +385,7 @@ export function SurveyPage() {
       <ContentArea>
         <AnimatePresence mode="wait" initial={false}>
           {showCompletionOnly ? (
-            <Card
+            <SurveyCard
               key="completion"
               variants={cardVariants}
               initial="enter"
@@ -364,9 +412,9 @@ export function SurveyPage() {
                   recommendations have been saved — good luck on your wellness journey!
                 </CompletionBody>
               </CompletionWrapper>
-            </Card>
+            </SurveyCard>
           ) : (
-            <Card
+            <SurveyCard
               key={currentNode.id}
               custom={direction}
               variants={cardVariants}
@@ -394,11 +442,30 @@ export function SurveyPage() {
                   data={sessionNodeToOffer(currentNode, currentNode.offers ?? [])}
                   onAccept={() => {
                     const primary = (currentNode.offers ?? []).find((o) => o.isPrimary) ?? (currentNode.offers ?? [])[0]
-                    handleOfferAccept(primary?.id, primary?.ctaUrl ?? undefined)
+                    // Prefer calendar URL when a booking integration is configured
+                    const url = primary?.calendarUrl ?? primary?.ctaUrl ?? undefined
+                    handleOfferAccept(primary?.id, url)
                   }}
                 />
               )}
-            </Card>
+
+              {isRedirect && currentNode.redirect && (
+                <RedirectStep
+                  title={currentNode.title ?? ''}
+                  description={currentNode.description ?? undefined}
+                  redirect={currentNode.redirect}
+                />
+              )}
+
+              {currentNode.type === 'LeadCapture' && currentNode.leadCapture && (
+                <LeadCaptureStep
+                  title={currentNode.title ?? ''}
+                  leadCapture={currentNode.leadCapture}
+                  onSubmit={handleLeadCapture}
+                  onSkip={!currentNode.leadCapture.isRequired ? handleInfoContinue : undefined}
+                />
+              )}
+            </SurveyCard>
           )}
         </AnimatePresence>
       </ContentArea>
@@ -407,113 +474,6 @@ export function SurveyPage() {
 }
 
 
-
-// ─── Global scroll reset for the survey page ─────────────────────────────────
-const SurveyPageGlobal = createGlobalStyle`
-  body { overflow-y: auto; }
-`
-
-// ─── Layout ───────────────────────────────────────────────────────────────────
-
-const PageShell = styled.div`
-  min-height: 100vh;
-  background: ${({ theme }) => theme.colors.bg};
-  display: flex;
-  flex-direction: column;
-`
-
-const TopBar = styled.header`
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  background: ${({ theme }) => theme.colors.bg};
-  border-bottom: 1px solid ${({ theme }) => theme.colors.border};
-  padding: 0 24px;
-  height: 56px;
-  display: flex;
-  align-items: center;
-  gap: 16px;
-
-  @media (max-width: ${({ theme }) => theme.breakpoints.mobile}) {
-    padding: 0 12px;
-    height: 48px;
-  }
-`
-
-const BrandName = styled.span`
-  font-size: ${({ theme }) => theme.typography.sizes.md};
-  font-weight: ${({ theme }) => theme.typography.weights.semibold};
-  color: ${({ theme }) => theme.colors.textPrimary};
-  flex: 1;
-  text-align: center;
-`
-
-const BackBtn = styled.button`
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  border-radius: ${({ theme }) => theme.radii.sm};
-  border: none;
-  background: transparent;
-  color: ${({ theme }) => theme.colors.textSecondary};
-  cursor: pointer;
-  transition: background ${({ theme }) => theme.transitions.fast};
-
-  &:hover {
-    background: ${({ theme }) => theme.colors.bgElevated};
-    color: ${({ theme }) => theme.colors.textPrimary};
-  }
-
-  &:disabled {
-    opacity: 0.3;
-    cursor: default;
-  }
-`
-
-// ─── Progress bar ─────────────────────────────────────────────────────────────
-
-const ProgressTrack = styled.div`
-  height: 3px;
-  background: ${({ theme }) => theme.colors.bgElevated};
-  width: 100%;
-`
-
-const ProgressFill = styled(motion.div)`
-  height: 100%;
-  background: ${({ theme }) => theme.colors.accent};
-  border-radius: 0 2px 2px 0;
-`
-
-// ─── Content area ─────────────────────────────────────────────────────────────
-
-const ContentArea = styled.main`
-  flex: 1;
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  padding: 48px 24px 80px;
-
-  @media (max-width: ${({ theme }) => theme.breakpoints.mobile}) {
-    padding: 20px 12px 40px;
-  }
-`
-
-const Card = styled(motion.div)`
-  background: ${({ theme }) => theme.colors.bgSurface};
-  border: 1px solid ${({ theme }) => theme.colors.border};
-  border-radius: ${({ theme }) => theme.radii.xl};
-  padding: 40px 40px;
-  width: 100%;
-  max-width: 600px;
-  box-shadow: ${({ theme }) => theme.shadows.md};
-
-  @media (max-width: ${({ theme }) => theme.breakpoints.mobile}) {
-    padding: 24px 16px;
-    border-radius: ${({ theme }) => theme.radii.lg};
-  }
-`
 
 // ─── Error / Not-found states ─────────────────────────────────────────────────
 

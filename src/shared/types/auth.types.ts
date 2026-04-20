@@ -15,3 +15,14 @@ export interface MeResponse {
   userName: string
   profileId: string
 }
+
+export interface SignupRequest {
+  email: string
+  password: string
+}
+
+export interface SignupResponse {
+  userId: string
+  email: string
+  userName: string
+}

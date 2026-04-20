@@ -2,14 +2,14 @@ import { useEffect, useRef, useState } from "react";
 import styled from "styled-components";
 import { useParams, useNavigate, Link } from "@tanstack/react-router";
 import { ReactFlowProvider } from "reactflow";
-import { ArrowLeft, Save, Eye, Circle } from "lucide-react";
+import { ArrowLeft, Save, Eye, Circle, Globe, BarChart3 } from "lucide-react";
 import { Button } from "@shared/ui/Button";
 import { Badge } from "@shared/ui/Badge";
 import { Spinner } from "@shared/ui/Spinner";
 import { ThemeSwitcher } from "@/components/ThemeSwitcher";
 import { DagCanvas } from "@features/dag-editor/components/DagCanvas";
 import { useDagStore } from "@features/dag-editor/store/dag.store";
-import { useFlow } from "@features/flows/hooks/useFlows";
+import { useFlow, usePublishFlow } from "@features/flows/hooks/useFlows";
 import {
   useCreateNode,
   useUpdateNode,
@@ -28,17 +28,20 @@ import {
   nodeToUpdateRequest,
 } from "@features/flows/utils/flow-adapter";
 import { optionsApi } from "@api/options.api";
+import { redirectLinksApi } from "@api/redirect-links.api";
+import { leadCaptureFieldsApi } from "@api/lead-capture-fields.api";
 import { useQueryClient } from "@tanstack/react-query";
 import type { FlowNodeDto, FlowEdgeDto } from "@shared/types/api.types";
 import { NodeType } from "@shared/types/dag.types";
 import type {
   QuestionNodeData,
+  RedirectNodeData,
+  LeadCaptureNodeData,
   EdgeConditions,
   DagNodeData,
 } from "@shared/types/dag.types";
 import type { Edge, Node } from "reactflow";
 import toast from "react-hot-toast";
-import { set } from "react-hook-form";
 
 /* ── Height chain explanation ───────────────────────────────────────────
    html/body → #root (flex column, min-h: 100vh)
@@ -98,6 +101,7 @@ export function DagEditorPage() {
   const originalNodesRef = useRef<FlowNodeDto[]>([]);
   const originalEdgesRef = useRef<FlowEdgeDto[]>([]);
   const [isSaving, setIsSaving] = useState(false);
+  const { mutateAsync: publishFlow, isPending: isPublishing } = usePublishFlow();
 
   // ── Load flow into DAG store on initial fetch ──────────────────────────
   useEffect(() => {
@@ -207,6 +211,7 @@ export function DagEditorPage() {
         const hasChanged =
           opt.label !== orig.label ||
           opt.value !== orig.value ||
+          (opt.scoreDelta ?? 0) !== (orig.scoreDelta ?? 0) ||
           i !== orig.displayOrder;
 
         if (hasChanged) {
@@ -214,6 +219,7 @@ export function DagEditorPage() {
             label: opt.label,
             value: opt.value,
             displayOrder: i,
+            scoreDelta: opt.scoreDelta ?? 0,
           });
         }
       } else {
@@ -222,10 +228,111 @@ export function DagEditorPage() {
           label: opt.label,
           value: opt.value,
           displayOrder: i,
+          scoreDelta: opt.scoreDelta ?? 0,
         });
       }
     }
   };
+
+  const syncRedirectLinksForNode = async (
+    node: Node<DagNodeData>,
+    origNode: FlowNodeDto,
+  ) => {
+    const rdData = node.data as RedirectNodeData
+    const origLinks = origNode.redirect?.links ?? []
+
+    const origLinkMap = new Map(origLinks.map((l) => [l.id, l]))
+    const currentLinkIds = new Set(
+      rdData.links.filter((l) => l.id).map((l) => l.id!),
+    )
+
+    // 1. Delete links removed from canvas
+    const toDelete = origLinks.filter((l) => !currentLinkIds.has(l.id))
+    await Promise.all(
+      toDelete.map((l) => redirectLinksApi.delete(node.id, l.id)),
+    )
+
+    // 2. Update existing and create new links
+    for (let i = 0; i < rdData.links.length; i++) {
+      const link = rdData.links[i]
+      const orig = link.id ? origLinkMap.get(link.id) : undefined
+
+      if (orig) {
+        const hasChanged =
+          link.label !== orig.label ||
+          link.url !== orig.url ||
+          i !== orig.displayOrder
+
+        if (hasChanged) {
+          await redirectLinksApi.update(node.id, orig.id, {
+            label: link.label,
+            url: link.url,
+            displayOrder: i,
+          })
+        }
+      } else {
+        await redirectLinksApi.create(node.id, {
+          label: link.label,
+          url: link.url,
+          displayOrder: i,
+        })
+      }
+    }
+  }
+
+  const syncLeadCaptureFieldsForNode = async (
+    node: Node<DagNodeData>,
+    origNode: FlowNodeDto,
+  ) => {
+    const lcData = node.data as LeadCaptureNodeData
+    const origFields = origNode.leadCapture?.fields ?? []
+
+    const origFieldMap = new Map(origFields.map((f) => [f.fieldType, f]))
+    const currentFieldTypes = new Set(lcData.fields.map((f) => f.fieldType))
+
+    // 1. Delete fields removed from canvas (never deletes Email — backend enforces)
+    const toDelete = origFields.filter((f) => !currentFieldTypes.has(f.fieldType as never))
+    await Promise.all(toDelete.map((f) => leadCaptureFieldsApi.remove(node.id, f.fieldType)))
+
+    // 2. Add new fields and update changed ones
+    for (let i = 0; i < lcData.fields.length; i++) {
+      const field = lcData.fields[i]
+      const orig = origFieldMap.get(field.fieldType)
+
+      if (!orig) {
+        await leadCaptureFieldsApi.add(node.id, {
+          fieldType: field.fieldType,
+          isRequired: field.isRequired,
+          displayOrder: i,
+          placeholder: field.placeholder || undefined,
+        })
+      } else {
+        const hasChanged =
+          field.isRequired !== orig.isRequired ||
+          (field.placeholder ?? null) !== orig.placeholder ||
+          i !== orig.displayOrder
+
+        if (hasChanged) {
+          await leadCaptureFieldsApi.update(node.id, field.fieldType, {
+            isRequired: field.isRequired,
+            displayOrder: i,
+            placeholder: field.placeholder || undefined,
+          })
+        }
+      }
+    }
+
+    // 3. Reorder if any displayOrder changed
+    const orderChanged = lcData.fields.some((f, i) => {
+      const orig = origFieldMap.get(f.fieldType)
+      return orig && orig.displayOrder !== i
+    })
+    if (orderChanged) {
+      await leadCaptureFieldsApi.reorder(node.id, {
+        items: lcData.fields.map((f, i) => ({ fieldType: f.fieldType, displayOrder: i })),
+      })
+    }
+  }
 
   // ── Save handler — diffs current canvas state against the loaded API data ──
   const handleSave = async () => {
@@ -285,11 +392,16 @@ export function DagEditorPage() {
             }),
           ]);
 
-          // Синхронізація опцій (тільки якщо це питання)
           if (node.data.type === NodeType.Question) {
-            // ... (логіка синхронізації опцій залишається незмінною,
-            // Так як усередині неї вже є свій диффінг)
             await syncOptionsForNode(node, originalNodeMap.get(node.id)!);
+          }
+
+          if (node.data.type === NodeType.Redirect) {
+            await syncRedirectLinksForNode(node, originalNodeMap.get(node.id)!);
+          }
+
+          if (node.data.type === NodeType.LeadCapture) {
+            await syncLeadCaptureFieldsForNode(node, originalNodeMap.get(node.id)!);
           }
         }
       }
@@ -314,6 +426,8 @@ export function DagEditorPage() {
 
       await Promise.all(
         edgesToProcess.map((edge) => {
+          const cond = getEdgeConditions(edge);
+          const operator = (cond.operator ?? "AND") as "AND" | "OR";
           if (!originalEdgeMap.has(edge.id)) {
             // НОВЕ РЕБРО
             return createEdge({
@@ -321,8 +435,8 @@ export function DagEditorPage() {
               data: {
                 sourceNodeId: resolveNodeId(edge.source),
                 targetNodeId: resolveNodeId(edge.target),
-                priority: getEdgeConditions(edge).priority,
-                conditionsJson: toConditionsJson(edge, edge.data.conditions.operator as "AND" |  "OR"),
+                priority: cond.priority,
+                conditionsJson: toConditionsJson(edge, operator),
               },
             });
           } else {
@@ -331,8 +445,8 @@ export function DagEditorPage() {
               flowId: surveyId,
               edgeId: edge.id,
               data: {
-                priority: getEdgeConditions(edge).priority,
-                conditionsJson: toConditionsJson(edge, edge.data.conditions.operator as "AND" |  "OR"),
+                priority: cond.priority,
+                conditionsJson: toConditionsJson(edge, operator),
               },
             });
           }
@@ -374,6 +488,19 @@ export function DagEditorPage() {
     navigate({ to: "/survey/$surveyId", params: { surveyId } });
   };
 
+  const handlePublish = async () => {
+    try {
+      await publishFlow(surveyId);
+      toast.success("Flow published!");
+    } catch {
+      toast.error("Failed to publish flow.");
+    }
+  };
+
+  const handleStats = () => {
+    navigate({ to: "/stats/$flowId", params: { flowId: surveyId } });
+  };
+
   return (
     <PageLayout>
       <EditorHeader>
@@ -401,13 +528,35 @@ export function DagEditorPage() {
         <ThemeSwitcher />
 
         <Button
-          variant="secondary"
+          variant="ghost"
           size="sm"
-          icon={<Eye size={14} />}
-          onClick={handleTest}
+          icon={<BarChart3 size={14} />}
+          onClick={handleStats}
         >
-          Preview
+          Stats
         </Button>
+
+        {flow.isPublished ? (
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={<Eye size={14} />}
+            onClick={handleTest}
+          >
+            Preview
+          </Button>
+        ) : (
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={isPublishing ? <Spinner size={14} /> : <Globe size={14} />}
+            onClick={handlePublish}
+            disabled={isPublishing}
+          >
+            {isPublishing ? "Publishing…" : "Publish"}
+          </Button>
+        )}
+
         <Button
           size="sm"
           icon={isSaving ? <Spinner size={14} /> : <Save size={14} />}

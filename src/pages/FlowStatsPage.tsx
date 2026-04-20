@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import styled, { useTheme } from "styled-components";
+import styled, { useTheme, keyframes } from "styled-components";
 import { motion, AnimatePresence } from "framer-motion";
 import { useParams, useNavigate } from "@tanstack/react-router";
 import {
@@ -20,6 +20,8 @@ import {
   AlertTriangle,
   ChevronDown,
   Timer,
+  ClipboardList,
+  CornerRightUp,
 } from "lucide-react";
 import { AdminLayout } from "@/components/AdminLayout";
 import { Button } from "@shared/ui/Button";
@@ -29,6 +31,7 @@ import { formatDate, formatNumber } from "@shared/utils/format";
 import { DONUT_COLORS, D_CX, D_CY, D_R, D_r, D_GAP, dSectorRaw, dSector } from "@shared/utils/donut";
 import type { FlowNodeDto } from "@shared/types/api.types";
 import { FlowPathSankey } from "@features/analytics/components/FlowPathSankey";
+import { LeadsTable } from "@features/leads/components/LeadsTable";
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 
@@ -61,6 +64,7 @@ function formatDuration(raw: string | null | undefined): string {
 function gatherOfferStats(nodes: FlowNodeDto[]) {
   const offers: {
     name: string;
+    offerId: string | null;
     impressions: number;
     conversions: number;
     conversionRate: number;
@@ -71,6 +75,7 @@ function gatherOfferStats(nodes: FlowNodeDto[]) {
     for (const no of node.nodeOffers) {
       offers.push({
         name: no.offer?.name || node.title || "Unnamed Offer",
+        offerId: no.offer?.id ?? null,
         impressions: node.stats?.offerImpressions ?? 0,
         conversions: node.stats?.offerConversions ?? 0,
         conversionRate: node.stats?.offerConversionRate ?? 0,
@@ -79,6 +84,7 @@ function gatherOfferStats(nodes: FlowNodeDto[]) {
     if (node.nodeOffers.length === 0 && (node.stats?.offerImpressions ?? 0) > 0) {
       offers.push({
         name: node.title || "Unnamed Offer",
+        offerId: null,
         impressions: node.stats?.offerImpressions ?? 0,
         conversions: node.stats?.offerConversions ?? 0,
         conversionRate: node.stats?.offerConversionRate ?? 0,
@@ -94,7 +100,7 @@ function gatherOfferStats(nodes: FlowNodeDto[]) {
 /** Build drop-off ranking from nodes */
 function buildDropOffRanking(nodes: FlowNodeDto[]) {
   return nodes
-    .filter((n) => (n.stats?.droppedOffCount ?? 0) > 0 && n.type === "Question")
+    .filter((n) => (n.stats?.droppedOffCount ?? 0) > 0 && (n.type === "Question" || n.type === "LeadCapture" || n.type === "InfoPage"))
     .map((n) => {
       const total = (n.stats!.answerCount ?? 0) + (n.stats!.droppedOffCount ?? 0);
       return {
@@ -113,20 +119,35 @@ function buildDropOffRanking(nodes: FlowNodeDto[]) {
 
 function nodeTypeIcon(type: string) {
   switch (type) {
-    case "Question": return <HelpCircle size={14} />;
-    case "InfoPage": return <FileText size={14} />;
-    case "Offer": return <Tag size={14} />;
-    default: return <Activity size={14} />;
+    case "Question":    return <HelpCircle size={14} />;
+    case "InfoPage":    return <FileText size={14} />;
+    case "Offer":       return <Tag size={14} />;
+    case "LeadCapture": return <ClipboardList size={14} />;
+    case "Redirect":    return <CornerRightUp size={14} />;
+    default:            return <Activity size={14} />;
   }
 }
 
 function nodeTypeColor(type: string, theme: any): string {
   switch (type) {
-    case "Question": return theme.colors.accent;
-    case "InfoPage": return theme.colors.success;
-    case "Offer": return theme.colors.warning;
-    default: return theme.colors.textSecondary;
+    case "Question":    return theme.colors.accent;
+    case "InfoPage":    return theme.colors.success;
+    case "Offer":       return theme.colors.warning;
+    case "LeadCapture": return '#3B82F6';
+    case "Redirect":    return '#EF4444';
+    default:            return theme.colors.textSecondary;
   }
+}
+
+// ─── Animation variants ───────────────────────────────────────────────────────
+
+const page = {
+  hidden: {},
+  show: { transition: { staggerChildren: 0.06 } },
+}
+const item = {
+  hidden: { opacity: 0, y: 14 },
+  show:   { opacity: 1, y: 0, transition: { duration: 0.2, ease: [0.25, 0.1, 0.25, 1] as const } },
 }
 
 // ─── Component ───────────────────────────────────────────────────────────────
@@ -184,32 +205,36 @@ export function FlowStatsPage() {
     });
   }, [offers, totalImpressions]);
 
-  if (isLoading) {
-    return (
-      <AdminLayout>
-        <CenterBlock><Spinner size={32} /></CenterBlock>
-      </AdminLayout>
-    );
-  }
-
-  if (isError || !flow) {
-    return (
-      <AdminLayout>
-        <CenterBlock>
-          <ErrorText>Failed to load flow statistics.</ErrorText>
-          <Button variant="secondary" onClick={() => navigate({ to: "/dashboard" })}>
-            Back to Dashboard
-          </Button>
-        </CenterBlock>
-      </AdminLayout>
-    );
-  }
-
   return (
     <AdminLayout>
-      <PageContent>
+      <AnimatePresence mode="wait">
+
+      {/* ── Skeleton — shown immediately while loading ─────────────── */}
+      {isLoading && <StatsPageSkeleton key="skeleton" />}
+
+      {/* ── Error state ────────────────────────────────────────────── */}
+      {!isLoading && (isError || !flow) && (
+        <motion.div
+          key="error"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+        >
+          <CenterBlock>
+            <ErrorText>Failed to load flow statistics.</ErrorText>
+            <Button variant="secondary" onClick={() => navigate({ to: "/dashboard" })}>
+              Back to Dashboard
+            </Button>
+          </CenterBlock>
+        </motion.div>
+      )}
+
+      {/* ── Real content ───────────────────────────────────────────── */}
+      {!isLoading && flow && (
+      <PageContent key="content" variants={page} initial="hidden" animate="show">
+        <Section variants={item}>
         <BackRow>
-          <Button variant="ghost" size="sm" icon={<ArrowLeft size={16} />} onClick={() => navigate({ to: "/dashboard" })}>
+          <Button variant="ghost" size="sm" icon={<ArrowLeft size={16} />} onClick={() => window.history.back()}>
             Back
           </Button>
         </BackRow>
@@ -227,7 +252,10 @@ export function FlowStatsPage() {
           )}
         </PageHeader>
 
+        </Section>
+
         {/* ── Overview ──────────────────────────────────────────────────── */}
+        <Section variants={item}>
         <SectionTitle>Overview</SectionTitle>
         <KpiGrid>
           {[
@@ -248,7 +276,10 @@ export function FlowStatsPage() {
           ))}
         </KpiGrid>
 
+        </Section>
+
         {/* ── Flow Structure (inline) ──────────────────────────────────── */}
+        <Section variants={item}>
         <StructureRow>
           <StructureChip><HelpCircle size={13} color={theme.colors.accent} />{stats?.questionCount ?? 0} Questions</StructureChip>
           <StructureChip><FileText size={13} color={theme.colors.success} />{stats?.infoPageCount ?? 0} Info Pages</StructureChip>
@@ -256,15 +287,20 @@ export function FlowStatsPage() {
           <StructureChip><GitBranch size={13} color={theme.colors.textTertiary} />{stats?.edgeCount ?? 0} Edges</StructureChip>
         </StructureRow>
 
+        </Section>
+
         {/* ── All User Paths (moved up) ─────────────────────────────────── */}
         {(flow.pathDistribution ?? []).length > 0 && (
+          <Section variants={item}>
           <>
             <SectionTitle><GitBranch size={18} /> All User Paths</SectionTitle>
             <FlowPathSankey paths={flow.pathDistribution!} nodeStatsMap={nodeStatsMap} />
           </>
+          </Section>
         )}
 
         {/* ── Session Timing ────────────────────────────────────────────── */}
+        <Section variants={item}>
         <SectionTitle><Timer size={18} /> Session Timing</SectionTitle>
         <TimingGrid>
           {[
@@ -301,7 +337,10 @@ export function FlowStatsPage() {
           ))}
         </TimingGrid>
 
+        </Section>
+
         {/* ── Offer Performance ─────────────────────────────────────────── */}
+        <Section variants={item}>
         <SectionTitle><Eye size={18} /> Offer Performance</SectionTitle>
         <OfferKpiRow>
           {(() => {
@@ -410,15 +449,14 @@ export function FlowStatsPage() {
                   </AnimatePresence>
                 </svg>
 
-                {/* Split legend — slides in below chart */}
-                <AnimatePresence>
-                  {hoveredSector !== null && (
-                    <motion.div
-                      initial={{ opacity: 0, y: -6 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -6 }}
-                      transition={{ duration: 0.18 }}
-                    >
+                {/* Split legend — fixed-height slot so it never shifts layout */}
+                <DonutLegendSlot>
+                  <motion.div
+                    animate={{ opacity: hoveredSector !== null ? 1 : 0 }}
+                    transition={{ duration: 0.18 }}
+                    style={{ pointerEvents: 'none' }}
+                  >
+                    {hoveredSector !== null && (
                       <DonutHoverLegend>
                         <DonutLegendRow>
                           <DonutLegendDot $color="#10b981" />
@@ -429,9 +467,9 @@ export function FlowStatsPage() {
                           Not converted ({(100 - sectors[hoveredSector].offer.conversionRate) % 1 === 0 ? (100 - sectors[hoveredSector].offer.conversionRate) : (100 - sectors[hoveredSector].offer.conversionRate).toFixed(1)}%)
                         </DonutLegendRow>
                       </DonutHoverLegend>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+                    )}
+                  </motion.div>
+                </DonutLegendSlot>
               </OfferDonutBox>
 
               <OfferLegendList>
@@ -473,7 +511,12 @@ export function FlowStatsPage() {
             {visibleOffers.map((offer, i) => {
               const share = totalImpressions > 0 ? offer.impressions / totalImpressions : 0;
               return (
-                <OfferRow key={i} $isTop={i === 0}>
+                <OfferRow
+                  key={i}
+                  $isTop={i === 0}
+                  $clickable={!!offer.offerId}
+                  onClick={() => offer.offerId && window.open(`/offer-preview?offerId=${offer.offerId}`, '_blank', 'noopener,noreferrer')}
+                >
                   <OfferRankCell>
                     {i === 0 ? <Award size={15} color={theme.colors.warning} /> : i + 1}
                   </OfferRankCell>
@@ -501,8 +544,17 @@ export function FlowStatsPage() {
           </OfferTable>
         )}
 
+        </Section>
+
+        {/* ── Leads ─────────────────────────────────────────────────────── */}
+        <Section variants={item}>
+          <SectionTitle><Users size={18} /> Leads</SectionTitle>
+          <LeadsTable flowId={flowId} />
+        </Section>
+
         {/* ── Drop-off Ranking ──────────────────────────────────────────── */}
         {dropOffRanking.length > 0 && (
+          <Section variants={item}>
           <>
             <SectionTitle><AlertTriangle size={18} /> Drop-off Hotspots</SectionTitle>
             <DropOffList>
@@ -531,10 +583,12 @@ export function FlowStatsPage() {
               ))}
             </DropOffList>
           </>
+          </Section>
         )}
 
         {/* ── Most Popular Path ──────────────────────────────────────── */}
         {popularPathData && popularPathData.nodes.length > 1 && (
+          <Section variants={item}>
           <>
             <SectionTitle><GitBranch size={18} /> Most Popular Path</SectionTitle>
             <PopularPathBadge>{formatNumber(popularPathData.count)} users took this path</PopularPathBadge>
@@ -561,10 +615,12 @@ export function FlowStatsPage() {
               ))}
             </PathContainer>
           </>
+          </Section>
         )}
 
         {/* ── Per-Node Stats ─────────────────────────────────────────── */}
         {nodesWithStats.length > 0 && (
+          <Section variants={item}>
           <>
             <SectionTitle><BarChart3 size={18} /> Per-Node Statistics</SectionTitle>
             <NodeTable>
@@ -608,15 +664,19 @@ export function FlowStatsPage() {
                 })}
             </NodeTable>
           </>
+          </Section>
         )}
       </PageContent>
+      )}
+
+      </AnimatePresence>
     </AdminLayout>
   );
 }
 
 // ─── Styles ──────────────────────────────────────────────────────────────────
 
-const PageContent = styled.div`
+const PageContent = styled(motion.div)`
   padding: 24px 32px 40px;
   flex: 1;
   max-width: 1100px;
@@ -837,7 +897,7 @@ const OfferTableHeader = styled.div`
   letter-spacing: 0.04em;
 `;
 
-const OfferRow = styled.div<{ $isTop: boolean }>`
+const OfferRow = styled.div<{ $isTop: boolean; $clickable: boolean }>`
   display: grid;
   grid-template-columns: 36px 1fr 100px 100px 80px 130px;
   gap: 6px;
@@ -845,9 +905,20 @@ const OfferRow = styled.div<{ $isTop: boolean }>`
   align-items: center;
   border-bottom: 1px solid ${({ theme }) => theme.colors.border};
   background: ${({ $isTop, theme }) => ($isTop ? `${theme.colors.warning}08` : "transparent")};
+  cursor: ${({ $clickable }) => ($clickable ? "pointer" : "default")};
+  transition: background ${({ theme }) => theme.transitions.fast};
 
   &:last-child {
     border-bottom: none;
+  }
+
+  &:hover {
+    background: ${({ $clickable, $isTop, theme }) =>
+      $clickable
+        ? theme.colors.bgElevated
+        : $isTop
+          ? `${theme.colors.warning}08`
+          : "transparent"};
   }
 `;
 
@@ -1284,11 +1355,20 @@ const OfferDonutBox = styled.div`
   border-right: 1px solid ${({ theme }) => theme.colors.border};
 `;
 
+/** Always occupies its height — legend fades in/out via opacity, no layout shift */
+const DonutLegendSlot = styled.div`
+  height: 48px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding-top: 4px;
+`;
+
 const DonutHoverLegend = styled.div`
   display: flex;
   flex-direction: column;
   gap: 4px;
-  margin-top: 10px;
 `;
 
 const DonutLegendRow = styled.div`
@@ -1378,3 +1458,203 @@ const OfferCvrBadge = styled.div<{ $color: string }>`
   padding: 2px 7px;
   white-space: nowrap;
 `;
+
+// ─── Section wrapper (stagger item + spacing) ─────────────────────────────────
+
+const Section = styled(motion.div)`
+  & + & { margin-top: 28px; }
+`;
+
+// ─── Skeleton ─────────────────────────────────────────────────────────────────
+
+const shimmerAnim = keyframes`
+  0%   { background-position: -600px 0; }
+  100% { background-position:  600px 0; }
+`;
+
+const Bone = styled.div<{ $w?: string; $h?: string; $r?: string }>`
+  width:         ${({ $w }) => $w ?? '100%'};
+  height:        ${({ $h }) => $h ?? '16px'};
+  border-radius: ${({ $r }) => $r ?? '6px'};
+  background: linear-gradient(
+    90deg,
+    ${({ theme }) => theme.colors.bgElevated} 25%,
+    ${({ theme }) => theme.colors.bgSurface}  50%,
+    ${({ theme }) => theme.colors.bgElevated} 75%
+  );
+  background-size: 600px 100%;
+  animation: ${shimmerAnim} 1.4s ease-in-out infinite;
+  flex-shrink: 0;
+`;
+
+const SkGrid = styled.div<{ $cols?: number; $gap?: string }>`
+  display: grid;
+  grid-template-columns: repeat(${({ $cols }) => $cols ?? 3}, 1fr);
+  gap: ${({ $gap }) => $gap ?? '12px'};
+`;
+
+const SkCard = styled.div`
+  background: ${({ theme }) => theme.colors.bgSurface};
+  border: 1px solid ${({ theme }) => theme.colors.border};
+  border-radius: ${({ theme }) => theme.radii.lg};
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+`;
+
+const SkRow = styled.div`
+  display: flex;
+  gap: 10px;
+  align-items: center;
+`;
+
+const SkSectionTitle = styled.div`
+  margin-bottom: 14px;
+`;
+
+function StatsPageSkeleton() {
+  return (
+    <PageContent
+      key="skeleton"
+      variants={page}
+      initial="hidden"
+      animate="show"
+      exit={{ opacity: 0 }}
+    >
+      {/* Back + header */}
+      <Section variants={item}>
+        <BackRow>
+          <Bone $w="72px" $h="30px" $r="8px" />
+        </BackRow>
+        <PageHeader>
+          <TitleBlock>
+            <Bone $w="220px" $h="28px" $r="8px" />
+            <Bone $w="140px" $h="16px" $r="6px" style={{ marginTop: 8 }} />
+          </TitleBlock>
+          <Bone $w="180px" $h="20px" $r="6px" />
+        </PageHeader>
+      </Section>
+
+      {/* Overview KPIs */}
+      <Section variants={item}>
+        <SkSectionTitle><Bone $w="90px" $h="20px" $r="6px" /></SkSectionTitle>
+        <SkGrid $cols={3} $gap="12px">
+          {Array.from({ length: 6 }).map((_, i) => (
+            <SkCard key={i}>
+              <SkRow>
+                <Bone $w="32px" $h="32px" $r="8px" />
+                <div style={{ flex: 1 }}>
+                  <Bone $w="60px" $h="22px" $r="5px" />
+                  <Bone $w="90px" $h="13px" $r="4px" style={{ marginTop: 6 }} />
+                </div>
+              </SkRow>
+            </SkCard>
+          ))}
+        </SkGrid>
+      </Section>
+
+      {/* Structure chips */}
+      <Section variants={item}>
+        <SkRow>
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Bone key={i} $w="110px" $h="32px" $r="8px" />
+          ))}
+        </SkRow>
+      </Section>
+
+      {/* Session Timing */}
+      <Section variants={item}>
+        <SkSectionTitle><Bone $w="140px" $h="20px" $r="6px" /></SkSectionTitle>
+        <SkGrid $cols={2} $gap="12px">
+          {Array.from({ length: 2 }).map((_, i) => (
+            <SkCard key={i}>
+              <Bone $w="120px" $h="14px" $r="4px" />
+              <SkRow>
+                {Array.from({ length: 4 }).map((_, j) => (
+                  <div key={j} style={{ flex: 1 }}>
+                    <Bone $h="20px" $r="5px" />
+                    <Bone $w="36px" $h="11px" $r="4px" style={{ marginTop: 5 }} />
+                  </div>
+                ))}
+              </SkRow>
+            </SkCard>
+          ))}
+        </SkGrid>
+      </Section>
+
+      {/* Offer Performance */}
+      <Section variants={item}>
+        <SkSectionTitle><Bone $w="160px" $h="20px" $r="6px" /></SkSectionTitle>
+        <SkGrid $cols={3} $gap="12px" style={{ marginBottom: 16 }}>
+          {Array.from({ length: 3 }).map((_, i) => (
+            <SkCard key={i}>
+              <SkRow>
+                <Bone $w="36px" $h="36px" $r="8px" />
+                <div style={{ flex: 1 }}>
+                  <Bone $w="50px" $h="22px" $r="5px" />
+                  <Bone $w="100px" $h="13px" $r="4px" style={{ marginTop: 6 }} />
+                </div>
+              </SkRow>
+            </SkCard>
+          ))}
+        </SkGrid>
+        <SkCard>
+          <SkRow>
+            <Bone $w="200px" $h="200px" $r="50%" style={{ flexShrink: 0 }} />
+            <div style={{ flex: 1 }}>
+              {Array.from({ length: 4 }).map((_, i) => (
+                <SkRow key={i} style={{ marginBottom: 10 }}>
+                  <Bone $w="10px" $h="10px" $r="50%" style={{ flexShrink: 0 }} />
+                  <Bone $h="14px" $r="5px" />
+                </SkRow>
+              ))}
+            </div>
+          </SkRow>
+        </SkCard>
+      </Section>
+
+      {/* Node Stats */}
+      <Section variants={item}>
+        <SkSectionTitle><Bone $w="130px" $h="20px" $r="6px" /></SkSectionTitle>
+        {Array.from({ length: 3 }).map((_, i) => (
+          <SkCard key={i} style={{ marginBottom: 8 }}>
+            <SkRow>
+              <Bone $w="28px" $h="28px" $r="6px" />
+              <Bone $w="200px" $h="16px" $r="5px" />
+              <div style={{ marginLeft: 'auto' }}>
+                <Bone $w="60px" $h="14px" $r="4px" />
+              </div>
+            </SkRow>
+            <SkGrid $cols={3} $gap="8px">
+              {Array.from({ length: 3 }).map((_, j) => (
+                <div key={j}>
+                  <Bone $h="18px" $r="5px" />
+                  <Bone $w="60%" $h="11px" $r="4px" style={{ marginTop: 4 }} />
+                </div>
+              ))}
+            </SkGrid>
+          </SkCard>
+        ))}
+      </Section>
+
+      {/* Drop-off Hotspots */}
+      <Section variants={item}>
+        <SkSectionTitle><Bone $w="160px" $h="20px" $r="6px" /></SkSectionTitle>
+        {Array.from({ length: 3 }).map((_, i) => (
+          <SkCard key={i} style={{ marginBottom: 8 }}>
+            <SkRow>
+              <Bone $w="28px" $h="28px" $r="6px" />
+              <Bone $h="16px" $r="5px" />
+              <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+                <Bone $w="44px" $h="22px" $r="999px" />
+                <Bone $w="44px" $h="22px" $r="999px" />
+              </div>
+            </SkRow>
+            <Bone $h="6px" $r="3px" />
+          </SkCard>
+        ))}
+      </Section>
+    </PageContent>
+  );
+}

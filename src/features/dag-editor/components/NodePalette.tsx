@@ -1,54 +1,72 @@
-import styled from "styled-components";
+import styled from 'styled-components'
 import {
   HelpCircle,
-  Info,
+  FileText,
   Gift,
+  ClipboardList,
+  XCircle,
   MousePointer2,
   ArrowRight,
-} from "lucide-react";
-import type { DragEvent } from "react";
-import { NodeType } from "@shared/types/dag.types";
+} from 'lucide-react'
+import type { DragEvent } from 'react'
+import { NodeType } from '@shared/types/dag.types'
 
 const nodeItems = [
   {
     type: NodeType.Question,
-    label: "Question",
-    desc: "Collect user data",
+    label: 'Question',
+    desc: 'Ask a qualifying question',
     icon: <HelpCircle size={15} />,
-    color: "#6366F1",
+    color: '#6366F1',
   },
   {
     type: NodeType.Info,
-    label: "Info Screen",
-    desc: "Motivate & engage",
-    icon: <Info size={15} />,
-    color: "#10B981",
+    label: 'Info Screen',
+    desc: 'Show context or instructions',
+    icon: <FileText size={15} />,
+    color: '#10B981',
   },
   {
     type: NodeType.Offer,
-    label: "Offer",
-    desc: "Terminal / CTA",
+    label: 'Offer',
+    desc: 'Present your offer to qualified leads',
     icon: <Gift size={15} />,
-    color: "#F59E0B",
+    color: '#F59E0B',
   },
-];
+  {
+    type: NodeType.LeadCapture,
+    label: 'Lead Capture',
+    desc: 'Collect contact information',
+    icon: <ClipboardList size={15} />,
+    color: '#3B82F6',
+  },
+  {
+    type: NodeType.Redirect,
+    label: 'Redirect',
+    desc: 'Route out unqualified leads',
+    icon: <XCircle size={15} />,
+    color: '#EF4444',
+  },
+]
 
 interface NodePaletteProps {
-  onDragStart: (e: DragEvent, type: NodeType) => void;
+  onDragStart: (e: DragEvent, type: NodeType) => void
 }
 
 export function NodePalette({ onDragStart }: NodePaletteProps) {
   return (
     <Panel>
-      <SectionTitle>Node Palette</SectionTitle>
+      <SectionTitle>Node Types</SectionTitle>
+
       {nodeItems.map(({ type, label, desc, icon, color }) => (
         <NodeBlock
           key={type}
           $color={color}
           draggable
           onDragStart={(e) => onDragStart(e, type)}
+          title={`Drag to add a ${label} node`}
         >
-          <span style={{ color, display: "flex" }}>{icon}</span>
+          <IconWrap $color={color}>{icon}</IconWrap>
           <BlockContent>
             <BlockLabel>{label}</BlockLabel>
             <BlockDesc>{desc}</BlockDesc>
@@ -57,23 +75,22 @@ export function NodePalette({ onDragStart }: NodePaletteProps) {
       ))}
 
       <HintBox>
-        <HintTitle>How to use</HintTitle>
+        <HintTitle>How to build a flow</HintTitle>
         <HintItem>
           <MousePointer2 size={12} color="#6366F1" />
           Drag a node type onto the canvas
         </HintItem>
         <HintItem>
           <ArrowRight size={12} color="#10B981" />
-          Connect nodes: drag from the right ● handle to another node's left ●
-          handle
+          Connect: drag from right ● to another node's left ●
         </HintItem>
         <HintItem>
           <HelpCircle size={12} color="#F59E0B" />
-          Click any node or edge to edit its properties
+          Click any node or edge to configure it
         </HintItem>
       </HintBox>
     </Panel>
-  );
+  )
 }
 
 const Panel = styled.aside`
@@ -83,10 +100,10 @@ const Panel = styled.aside`
   padding: 14px 12px 20px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 5px;
   overflow-y: auto;
   flex-shrink: 0;
-`;
+`
 
 const SectionTitle = styled.p`
   font-size: ${({ theme }) => theme.typography.sizes.xs};
@@ -94,14 +111,21 @@ const SectionTitle = styled.p`
   color: ${({ theme }) => theme.colors.textTertiary};
   text-transform: uppercase;
   letter-spacing: 0.8px;
-  padding: 2px 4px 10px;
-`;
+  padding: 2px 4px 8px;
+`
+
+const IconWrap = styled.span<{ $color: string }>`
+  display: flex;
+  align-items: center;
+  color: ${({ $color }) => $color};
+  flex-shrink: 0;
+`
 
 const NodeBlock = styled.div<{ $color: string }>`
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 10px 11px;
+  padding: 9px 11px;
   background: ${({ theme }) => theme.colors.bgElevated};
   border: 1px solid ${({ theme }) => theme.colors.border};
   border-left: 3px solid ${({ $color }) => $color};
@@ -112,44 +136,47 @@ const NodeBlock = styled.div<{ $color: string }>`
 
   &:hover {
     background: ${({ $color }) => $color}0d;
-    border-color: ${({ $color }) => $color}50;
+    border-color: ${({ $color }) => $color}55;
     transform: translateX(3px);
     box-shadow: -2px 0 0 ${({ $color }) => $color};
   }
+
   &:active {
     cursor: grabbing;
     opacity: 0.85;
   }
-`;
+`
+
+const BlockContent = styled.div``
 
 const BlockLabel = styled.span`
   font-size: ${({ theme }) => theme.typography.sizes.sm};
   font-weight: ${({ theme }) => theme.typography.weights.semibold};
   color: ${({ theme }) => theme.colors.textPrimary};
-`;
+  display: block;
+`
 
 const BlockDesc = styled.p`
   font-size: ${({ theme }) => theme.typography.sizes.xs};
   color: ${({ theme }) => theme.colors.textTertiary};
   margin-top: 1px;
-`;
-
-const BlockContent = styled.div``;
+  line-height: 1.3;
+`
 
 const HintBox = styled.div`
-  margin-top: 16px;
+  margin-top: 14px;
   padding: 10px 12px;
   background: ${({ theme }) => theme.colors.bgElevated};
   border-radius: ${({ theme }) => theme.radii.md};
   border: 1px dashed ${({ theme }) => theme.colors.border};
-`;
+`
 
 const HintTitle = styled.p`
   font-size: 10.5px;
   font-weight: 600;
   color: ${({ theme }) => theme.colors.textSecondary};
   margin-bottom: 8px;
-`;
+`
 
 const HintItem = styled.div`
   display: flex;
@@ -164,4 +191,8 @@ const HintItem = styled.div`
     flex-shrink: 0;
     margin-top: 1px;
   }
-`;
+
+  &:last-child {
+    margin-bottom: 0;
+  }
+`

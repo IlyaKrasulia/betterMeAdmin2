@@ -1,7 +1,9 @@
 import styled from 'styled-components'
 import { motion } from 'framer-motion'
+import { Link } from '@tanstack/react-router'
 import { LoginForm } from '@features/auth/components/LoginForm'
 import { ThemeSwitcher } from '@/components/ThemeSwitcher'
+import { RoutlyLogo } from '@shared/ui/RoutlyLogo'
 
 export function LoginPage() {
   return (
@@ -14,10 +16,16 @@ export function LoginPage() {
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4, ease: 'easeOut' }}
       >
-        <LogoMark>🌿</LogoMark>
+        <LogoWrap>
+          <RoutlyLogo size="lg" />
+        </LogoWrap>
         <Heading>Welcome back</Heading>
-        <Subheading>Sign in to your Wellness Admin panel</Subheading>
+        <Subheading>Sign in to your Routly dashboard</Subheading>
         <LoginForm />
+        <SignUpLine>
+          Don't have an account?{' '}
+          <SignUpLink to="/signup">Sign up free</SignUpLink>
+        </SignUpLine>
       </Card>
     </Page>
   )
@@ -49,16 +57,8 @@ const Card = styled(motion.div)`
   box-shadow: ${({ theme }) => theme.shadows.lg};
 `
 
-const LogoMark = styled.div`
-  width: 44px;
-  height: 44px;
-  background: ${({ theme }) => theme.colors.accent};
-  border-radius: ${({ theme }) => theme.radii.md};
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 22px;
-  margin-bottom: 24px;
+const LogoWrap = styled.div`
+  margin-bottom: 28px;
 `
 
 const Heading = styled.h1`
@@ -72,4 +72,19 @@ const Subheading = styled.p`
   font-size: ${({ theme }) => theme.typography.sizes.sm};
   color: ${({ theme }) => theme.colors.textSecondary};
   margin-bottom: 32px;
+`
+
+const SignUpLine = styled.p`
+  text-align: center;
+  margin-top: 20px;
+  font-size: ${({ theme }) => theme.typography.sizes.sm};
+  color: ${({ theme }) => theme.colors.textTertiary};
+`
+
+const SignUpLink = styled(Link)`
+  color: ${({ theme }) => theme.colors.accent};
+  text-decoration: none;
+  font-weight: 600;
+  transition: opacity 0.15s;
+  &:hover { opacity: 0.8; }
 `

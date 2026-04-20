@@ -1,23 +1,11 @@
-// ─── DAG Node Types ───────────────────────────────────────────────────────────
+// ─── Node Types ───────────────────────────────────────────────────────────────
 
 export enum NodeType {
   Question = 'Question',
-  Info = 'Info',
+  Info = 'Info',           // maps to backend 'InfoPage'
   Offer = 'Offer',
-}
-
-export enum AttributeKey {
-  Age = 'age',
-  Gender = 'gender',
-  Goal = 'goal',
-  Location = 'location',
-  FitnessLevel = 'fitness_level',
-  AvailableTime = 'available_time',
-  Injuries = 'injuries',
-  Motivation = 'motivation',
-  StressLevel = 'stress_level',
-  SleepLevel = 'sleep_level',
-  EnergyLevel = 'energy_level',
+  LeadCapture = 'LeadCapture',
+  Redirect = 'Redirect',
 }
 
 export enum ValueKind {
@@ -29,65 +17,129 @@ export enum AnswerType {
   SingleChoice = 'SingleChoice',
   MultipleChoice = 'MultipleChoice',
   Slider = 'Slider',
+  Text = 'Text',
 }
 
+export type LeadCaptureFieldType =
+  | 'FullName'
+  | 'Email'
+  | 'Phone'
+  | 'CompanyName'
+  | 'JobTitle'
+  | 'CompanySize'
+  | 'Website'
 
+export type QualificationTier = 'Hot' | 'Warm' | 'Cold' | 'Disqualified'
+
+export type CalendarProvider = 'None' | 'Calendly' | 'CalCom' | 'HubSpot' | 'Custom'
+
+// Kept for FlowDetail.attributeKeys compatibility; key is now a plain string
 export interface AttributeKeyOption {
-  value: string;
-  label: string;
-  key: AttributeKey;
+  value: string
+  label: string
+  key: string
 }
 
 export interface AnswerOption {
   id: string
   label: string
-  icon?: string
   value: string
+  /** Score contribution when this option is selected (+/- int). */
+  scoreDelta: number
 }
 
-// ─── Node Data Discriminated Union ───────────────────────────────────────────
+// ─── Node Data Discriminated Union ────────────────────────────────────────────
 
 export interface QuestionNodeData {
   type: NodeType.Question
-  questionText: string
-  attribute: AttributeKey
+  /** Question title shown to the lead. */
+  title: string
+  description?: string
+  /** Free-form attribute key stored in answer context (e.g. "job_title"). */
+  attributeKey: string
   answerType: AnswerType
+  valueKind: ValueKind
   options: AnswerOption[]
-  valueKind?: ValueKind // used for dynamic form generation; matches one of the ValueKind values
-  /** Slider lower bound (only used when answerType is Slider) */
+  /** Slider lower bound (only when answerType = Slider). */
   min?: number
-  /** Slider upper bound (only used when answerType is Slider) */
+  /** Slider upper bound (only when answerType = Slider). */
   max?: number
+  mediaUrl?: string
 }
 
 export interface InfoNodeData {
   type: NodeType.Info
   title: string
   body: string
-  imageUrl?: string
+  mediaUrl?: string
 }
 
 export interface OfferNodeData {
   type: NodeType.Offer
+  /** Internal builder name — never shown to the lead. */
+  name: string
+  slug?: string
+  /** Lead-facing headline. Supports {{token}} substitution. */
   headline: string
-  description: string
-  ctaText: string
-  /** URL destination for the call-to-action button. */
-  ctaUrl?: string
-  price?: number
-  /** URL of the image to display for this offer. */
+  /** Lead-facing body copy. */
+  body: string
   imageUrl?: string
-  kitName?: string
-  kitContents?: string
+  ctaText: string
+  ctaUrl?: string
+  /** When set, renders a calendar booking embed instead of plain CTA. */
+  calendarUrl?: string
+  calendarProvider?: CalendarProvider
+  tier?: QualificationTier
   /** ID of the NodeOffer link record (populated when loaded from API). */
   nodeOfferId?: string
   /** ID of the linked Offer entity (populated when loaded from API). */
   offerId?: string
 }
 
-export type DagNodeData = (QuestionNodeData | InfoNodeData | OfferNodeData) & {
-  isLocal?: boolean
+export interface LeadCaptureField {
+  fieldType: LeadCaptureFieldType
+  isRequired: boolean
+  displayOrder: number
+  placeholder?: string
 }
+
+export interface LeadCaptureNodeData {
+  type: NodeType.LeadCapture
+  /** Title shown above the form. */
+  title: string
+  /** If false the lead sees a Skip button. */
+  isRequired: boolean
+  fields: LeadCaptureField[]
+}
+
+export interface RedirectLink {
+  /** Server-side ID — present for links loaded from API, absent for newly added links. */
+  id?: string
+  label: string
+  url: string
+  displayOrder: number
+}
+
+export interface RedirectNodeData {
+  type: NodeType.Redirect
+  /** Title shown on the redirect screen (replaces old "headline"). */
+  title: string
+  /** Body copy shown below the title (replaces old "body"). */
+  description: string
+  tier: QualificationTier
+  redirectUrl?: string
+  /** Seconds before auto-redirect fires (null = no auto-redirect). */
+  autoRedirectAfterSeconds?: number
+  links: RedirectLink[]
+}
+
+export type DagNodeData = (
+  | QuestionNodeData
+  | InfoNodeData
+  | OfferNodeData
+  | LeadCaptureNodeData
+  | RedirectNodeData
+) & { isLocal?: boolean }
 
 // ─── DAG Node (React Flow node) ───────────────────────────────────────────────
 
@@ -101,13 +153,6 @@ export interface DagNode {
 
 // ─── Edge Conditions ─────────────────────────────────────────────────────────
 
-/**
- * Logical operators for edge condition rules.
- *  - Equality:  eq, neq
- *  - Numeric:   gt, gte, lt, lte, between
- *  - Set:       in, not_in  (comma-separated values)
- *  - Text:      contains
- */
 export type EdgeOperator =
   | 'eq'
   | 'neq'
@@ -120,34 +165,21 @@ export type EdgeOperator =
   | 'not_in'
   | 'contains'
 
-/**
- * A single AND-combined condition rule stored on an edge.
- * Backend JSON format: { AttributeKey, Operator, Value, ValueTo? }
- *   - 'between':  value = range start, valueTo = range end
- *   - 'in'/'not_in': value = comma-separated list
- *   - all others: value = single string
- */
 export interface EdgeConditionRule {
-  attributeKey: string     // matches a question node's AttributeKey
-  operator?: EdgeOperator   // comparison operator
-  value: string            // primary value (or range start for 'between')
-  valueTo?: string         // range end — only used with 'between'
+  attributeKey: string
+  operator?: EdgeOperator
+  value: string
+  valueTo?: string
 }
 
-/**
- * All routing config for one edge, stored in edge.data.conditions.
- * Serialised to conditionsJson on save:
- *   - always=true  → null          (unconditional fallback)
- *   - always=false → JSON array of EdgeConditionRule objects
- */
 export interface EdgeConditions {
-  always: boolean           // true = unconditional; conditionsJson will be null
-  rules: EdgeConditionRule[] // AND logic; ignored when always=true
-  priority: number          // higher = evaluated first; 0 = lowest (default for fallback)
-  operator?: "AND" | "OR" // how to combine multiple rules; default is "AND"
+  always: boolean
+  rules: EdgeConditionRule[]
+  priority: number
+  operator?: 'AND' | 'OR'
 }
 
-// ─── DAG Edge (React Flow edge + conditions) ─────────────────────────────────
+// ─── DAG Edge (React Flow edge + conditions) ──────────────────────────────────
 
 export interface DagEdge {
   id: string
@@ -157,7 +189,7 @@ export interface DagEdge {
   data?: { label?: string; conditions?: EdgeConditions }
 }
 
-// ─── Survey / Funnel ─────────────────────────────────────────────────────────
+// ─── Survey / Funnel ──────────────────────────────────────────────────────────
 
 export enum SurveyStatus {
   Draft = 'draft',

@@ -69,10 +69,12 @@ function formatDuration(raw: string | null | undefined): string | null {
 
 function nodeTypeColor(type: string, theme: any): string {
   switch (type) {
-    case 'Question': return theme.colors.accent
-    case 'InfoPage': return theme.colors.success
-    case 'Offer': return theme.colors.warning
-    default: return theme.colors.textSecondary
+    case 'Question':    return theme.colors.accent
+    case 'InfoPage':    return theme.colors.success
+    case 'Offer':       return theme.colors.warning
+    case 'LeadCapture': return '#3B82F6'
+    case 'Redirect':    return '#EF4444'
+    default:            return theme.colors.textSecondary
   }
 }
 
@@ -249,6 +251,8 @@ export function FlowPathSankey({ paths, nodeStatsMap }: Props) {
         <LegendItem><LegendDot $color={theme.colors.accent} /> Question</LegendItem>
         <LegendItem><LegendDot $color={theme.colors.success} /> Info Page</LegendItem>
         <LegendItem><LegendDot $color={theme.colors.warning} /> Offer</LegendItem>
+        <LegendItem><LegendDot $color="#3B82F6" /> Lead Capture</LegendItem>
+        <LegendItem><LegendDot $color="#EF4444" /> Redirect</LegendItem>
         <LegendHint>Brighter bands = more users</LegendHint>
       </Legend>
 
@@ -450,14 +454,16 @@ export function FlowPathSankey({ paths, nodeStatsMap }: Props) {
               <NodePanelDivider />
               <NodePanelStat>
                 <NodePanelStatLabel>Reach</NodePanelStatLabel>
-                <NodePanelStatVal>{node.totalCount}</NodePanelStatVal>
+                {/* Use answerCount+droppedOffCount when available — it's the true total;
+                    node.totalCount only counts users who continued past this node */}
+                <NodePanelStatVal>{ns ? total : node.totalCount}</NodePanelStatVal>
               </NodePanelStat>
               {ns && (
                 <>
-                  {node.type !== 'Offer' && (
+                  {(node.type === 'Question' || node.type === 'InfoPage' || node.type === 'LeadCapture') && (
                     <>
                       <NodePanelStat>
-                        <NodePanelStatLabel>Responses</NodePanelStatLabel>
+                        <NodePanelStatLabel>{node.type === 'LeadCapture' ? 'Submitted' : 'Responses'}</NodePanelStatLabel>
                         <NodePanelStatVal>{ns.answerCount}</NodePanelStatVal>
                       </NodePanelStat>
                       <NodePanelStat>
@@ -476,7 +482,7 @@ export function FlowPathSankey({ paths, nodeStatsMap }: Props) {
                         <>
                           <NodePanelDivider />
                           <NodePanelStat>
-                            <NodePanelStatLabel>Avg answer time</NodePanelStatLabel>
+                            <NodePanelStatLabel>Avg time</NodePanelStatLabel>
                             <NodePanelStatVal>{formatDuration(ns.avgAnswerDuration)}</NodePanelStatVal>
                           </NodePanelStat>
                         </>
@@ -498,6 +504,9 @@ export function FlowPathSankey({ paths, nodeStatsMap }: Props) {
                         <NodePanelStatVal>{(ns.offerConversionRate ?? 0).toFixed(1)}%</NodePanelStatVal>
                       </NodePanelStat>
                     </>
+                  )}
+                  {node.type === 'Redirect' && (
+                    <NodePanelMuted>Terminal node</NodePanelMuted>
                   )}
                 </>
               )}

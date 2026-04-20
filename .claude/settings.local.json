@@ -16,7 +16,16 @@
       "Bash(find \"C:\\\\Users\\\\produ\\\\Downloads\\\\admin-app-BetterMe-main \\(3\\)\\\\admin-app-BetterMe-main/src/features/survey-client\" -type f)",
       "Bash(npx vite:*)",
       "Bash(find /c/Users/produ/Downloads/betterMeAdmin2/src -type f \\\\\\(-name *.tsx -o -name *.ts \\\\\\))",
-      "Bash(find /c/Users/produ/Downloads/betterMeAdmin2/src -type f \\\\\\(-name *tats* -o -name *Stat* \\\\\\))"
+      "Bash(find /c/Users/produ/Downloads/betterMeAdmin2/src -type f \\\\\\(-name *tats* -o -name *Stat* \\\\\\))",
+      "Bash(grep -n \"animation.*\\\\${\" src/features/landing/components/*.tsx src/pages/LandingPage.tsx)",
+      "Bash(grep -n \"animation.*\\\\${\" src/features/landing/components/*.tsx)",
+      "Bash(grep -v \"styled\\\\|css\\\\`\\\\|animation: \\\\${[a-z]\")",
+      "Bash(grep -n \"keyframes\" src/features/landing/components/*.tsx src/pages/LandingPage.tsx)",
+      "Bash(grep -n \"\\\\${blink}\\\\|\\\\${drawLine}\\\\|\\\\${edgeGlow}\\\\|\\\\${rotate}\\\\|\\\\${float1}\\\\|\\\\${float2}\\\\|\\\\${float3}\\\\|\\\\${slideIn}\\\\|\\\\${pulse}\\\\|\\\\${slideDown}\\\\|\\\\${shimmer}\" src/features/landing/components/*.tsx src/pages/LandingPage.tsx)",
+      "Bash(grep -n \"^\\\\s*\\\\`.*\\\\${\" src/features/landing/components/*.tsx)",
+      "Bash(grep -v \"styled\\\\|css\\\\`\\\\|keyframes\\\\`\\\\|\\\\/\\\\/\")",
+      "Bash(node -e ':*)",
+      "Bash(python3 -c ':*)"
     ]
   }
 }

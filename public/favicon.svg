@@ -1,4 +1,8 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-  <rect width="32" height="32" rx="8" fill="#6366F1"/>
-  <text x="7" y="23" font-size="18" font-family="system-ui">🌿</text>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none">
+  <rect width="24" height="24" rx="7" fill="#6366F1"/>
+  <circle cx="7.5" cy="7.5" r="2.2" fill="white"/>
+  <circle cx="7.5" cy="16.5" r="2.2" fill="white"/>
+  <circle cx="17" cy="12" r="2.2" fill="white"/>
+  <path d="M9.7 7.5 C13 7.5 13 12 14.8 12" stroke="rgba(255,255,255,0.65)" stroke-width="1.6" stroke-linecap="round" fill="none"/>
+  <path d="M9.7 16.5 C13 16.5 13 12 14.8 12" stroke="rgba(255,255,255,0.65)" stroke-width="1.6" stroke-linecap="round" fill="none"/>
 </svg>

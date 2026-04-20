@@ -1,3 +1,4 @@
+import { useState, useRef, useCallback } from "react";
 import styled from "styled-components";
 import { motion, AnimatePresence } from "framer-motion";
 import { X } from "lucide-react";
@@ -8,43 +9,88 @@ import {
   selectSelectedNode,
   selectSelectedEdge,
 } from "../store/dag.store";
-import { AttributeKeyOption } from "@shared/types/dag.types";
 import { NodeType } from "@shared/types/dag.types";
 import {
   EdgeProperties,
   EntryNodeSection,
   InfoProperties,
+  LeadCaptureProperties,
   OfferProperties,
   QuestionProperties,
+  RedirectProperties,
 } from "./PanelStates";
 
-export function PropertiesPanel({
-  attributeKeys,
-}: {
-  attributeKeys: AttributeKeyOption[];
-}) {
-  const selectedNode = useDagStore(selectSelectedNode);
-  const selectedEdge = useDagStore(selectSelectedEdge);
+const NODE_TITLES: Partial<Record<NodeType, string>> = {
+  [NodeType.Question]:    "Question",
+  [NodeType.Info]:        "Info Screen",
+  [NodeType.Offer]:       "Offer",
+  [NodeType.LeadCapture]: "Lead Capture",
+  [NodeType.Redirect]:    "Redirect",
+};
+
+const MIN_WIDTH = 220;
+const MAX_WIDTH = 520;
+const DEFAULT_WIDTH = 280;
+
+export function PropertiesPanel() {
+  const selectedNode  = useDagStore(selectSelectedNode);
+  const selectedEdge  = useDagStore(selectSelectedEdge);
   const setSelectedNode = useDagStore((s) => s.setSelectedNode);
   const setSelectedEdge = useDagStore((s) => s.setSelectedEdge);
 
+  const [panelWidth, setPanelWidth] = useState(DEFAULT_WIDTH);
+  const isResizing = useRef(false);
+
   const isOpen = !!selectedNode || !!selectedEdge;
+
+  const title = selectedNode
+    ? `${NODE_TITLES[selectedNode.type as NodeType] ?? selectedNode.type} Node`
+    : "Edge Condition";
+
+  // ─── Resize handle ─────────────────────────────────────────────────────────
+  const handleResizeMouseDown = useCallback(
+    (e: React.MouseEvent) => {
+      e.preventDefault();
+      isResizing.current = true;
+
+      const startX     = e.clientX;
+      const startWidth = panelWidth;
+
+      const onMouseMove = (ev: MouseEvent) => {
+        if (!isResizing.current) return;
+        // panel is on the right — dragging the left edge left = wider
+        const delta    = startX - ev.clientX;
+        const newWidth = Math.min(MAX_WIDTH, Math.max(MIN_WIDTH, startWidth + delta));
+        setPanelWidth(newWidth);
+      };
+
+      const onMouseUp = () => {
+        isResizing.current = false;
+        window.removeEventListener("mousemove", onMouseMove);
+        window.removeEventListener("mouseup",   onMouseUp);
+      };
+
+      window.addEventListener("mousemove", onMouseMove);
+      window.addEventListener("mouseup",   onMouseUp);
+    },
+    [panelWidth],
+  );
 
   return (
     <AnimatePresence>
       {isOpen && (
         <Panel
-          initial={{ x: 280, opacity: 0 }}
-          animate={{ x: 0, opacity: 1 }}
-          exit={{ x: 280, opacity: 0 }}
+          style={{ width: panelWidth }}
+          initial={{ x: "100%", opacity: 0 }}
+          animate={{ x: 0,      opacity: 1 }}
+          exit={{ x: "100%",    opacity: 0 }}
           transition={{ type: "spring", damping: 30, stiffness: 300 }}
         >
+          {/* ── Drag handle (left edge) ── */}
+          <ResizeHandle onMouseDown={handleResizeMouseDown} />
+
           <PanelHeader>
-            <PanelTitle>
-              {selectedNode
-                ? `${selectedNode.type?.charAt(0).toUpperCase()}${selectedNode.type?.slice(1)} Node`
-                : "Edge Condition"}
-            </PanelTitle>
+            <PanelTitle>{title}</PanelTitle>
             <Button
               variant="ghost"
               size="sm"
@@ -58,7 +104,6 @@ export function PropertiesPanel({
           </PanelHeader>
 
           <PanelBody>
-            {selectedNode && <EntryNodeSection nodeId={selectedNode.id} />}
             {selectedNode && selectedNode.type === NodeType.Question && (
               <QuestionProperties node={selectedNode} />
             )}
@@ -68,12 +113,19 @@ export function PropertiesPanel({
             {selectedNode && selectedNode.type === NodeType.Offer && (
               <OfferProperties node={selectedNode} />
             )}
-            {selectedEdge && (
-              <EdgeProperties
-                edge={selectedEdge}
-                attributeKeys={attributeKeys}
-              />
+            {selectedNode && selectedNode.type === NodeType.LeadCapture && (
+              <LeadCaptureProperties node={selectedNode} />
             )}
+            {selectedNode && selectedNode.type === NodeType.Redirect && (
+              <RedirectProperties node={selectedNode} />
+            )}
+            {selectedEdge && <EdgeProperties edge={selectedEdge} />}
+
+            {selectedNode &&
+              selectedNode.type !== NodeType.Offer &&
+              selectedNode.type !== NodeType.Redirect && (
+                <EntryNodeSection nodeId={selectedNode.id} />
+              )}
           </PanelBody>
         </Panel>
       )}
@@ -81,16 +133,40 @@ export function PropertiesPanel({
   );
 }
 
-// ───────────────────────────────────────────────────────────────────────────────── Styles ───────────────────────────────────────────────────────────────────
+// ─── Styles ───────────────────────────────────────────────────────────────────
 
 const Panel = styled(motion.aside)`
-  width: 280px;
+  /* width is set via inline style (resizable) */
+  min-width: ${MIN_WIDTH}px;
+  max-width: ${MAX_WIDTH}px;
   background: ${({ theme }) => theme.colors.bgSurface};
   border-left: 1px solid ${({ theme }) => theme.colors.border};
   display: flex;
   flex-direction: column;
   overflow: hidden;
   flex-shrink: 0;
+  position: relative;
+`;
+
+/**
+ * Invisible 6-px strip on the left edge of the panel that becomes a
+ * col-resize cursor and lights up the accent colour on hover.
+ */
+const ResizeHandle = styled.div`
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 6px;
+  cursor: col-resize;
+  z-index: 20;
+  border-left: 2px solid transparent;
+  transition: border-color 0.15s;
+
+  &:hover,
+  &:active {
+    border-color: ${({ theme }) => theme.colors.accent};
+  }
 `;
 
 const PanelHeader = styled.div`

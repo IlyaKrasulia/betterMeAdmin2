@@ -1,171 +1,195 @@
 /**
- * Conversion utilities between the backend API DTOs (FlowNodeDto / FlowEdgeDto)
- * and the React-Flow / DAG-store types used in the editor canvas.
+ * Conversion utilities between backend API DTOs (FlowNodeDto / FlowEdgeDto)
+ * and React-Flow / DAG-store types used in the editor canvas.
  */
 
-import { MarkerType } from "reactflow";
-import type { Node, Edge } from "reactflow";
+import { MarkerType } from 'reactflow'
+import type { Node, Edge } from 'reactflow'
 import type {
   FlowNodeDto,
   FlowEdgeDto,
   CreateNodeRequest,
   UpdateNodeRequest,
   AdminFlowNodeType,
-} from "@shared/types/api.types";
-import { NodeType, AttributeKey, AnswerType, ValueKind } from "@shared/types/dag.types";
+} from '@shared/types/api.types'
+import {
+  NodeType,
+  AnswerType,
+  ValueKind,
+  type QualificationTier,
+  type CalendarProvider,
+} from '@shared/types/dag.types'
 import type {
   DagNodeData,
   QuestionNodeData,
   InfoNodeData,
   OfferNodeData,
+  LeadCaptureNodeData,
+  RedirectNodeData,
   EdgeConditions,
   EdgeOperator,
-} from "@shared/types/dag.types";
-
-const VALID_ANSWER_TYPES = new Set<string>(Object.values(AnswerType));
+  LeadCaptureField,
+  RedirectLink,
+} from '@shared/types/dag.types'
 
 // ─── API → DAG ────────────────────────────────────────────────────────────────
 
-/**
- * Map the API `type` string to the internal `NodeType` enum.
- * The API uses `'info_page'`; the canvas uses `'info'`.
- */
 function apiTypeToNodeType(apiType: string): NodeType {
-  if (apiType === "InfoPage") return NodeType.Info;
-  if (apiType === "Offer") return NodeType.Offer;
-  return NodeType.Question;
+  switch (apiType) {
+    case 'InfoPage':     return NodeType.Info
+    case 'Offer':        return NodeType.Offer
+    case 'LeadCapture':  return NodeType.LeadCapture
+    case 'Redirect':     return NodeType.Redirect
+    default:             return NodeType.Question
+  }
 }
 
-/**
- * Convert a single `FlowNodeDto` from the admin API into a ReactFlow
- * `Node<DagNodeData>` that can be loaded into the DAG store / canvas.
- */
 export function flowNodeToNode(dto: FlowNodeDto): Node<DagNodeData> {
-  const nodeType = apiTypeToNodeType(dto.type);
+  const nodeType = apiTypeToNodeType(dto.type)
+  let data: DagNodeData
 
-  let data: DagNodeData;
   switch (dto.type) {
-    case "Question": {
+    case 'Question': {
       const d: QuestionNodeData = {
         type: NodeType.Question,
-        questionText: dto.title,
-        attribute: (dto.attributeKey as AttributeKey) ?? AttributeKey.Goal,
-        answerType: dto.answerType,
+        title: dto.title,
+        description: dto.description ?? undefined,
+        attributeKey: dto.attributeKey ?? '',
+        answerType: dto.answerType ?? AnswerType.SingleChoice,
+        valueKind: dto.valueKind ?? ValueKind.Text,
         options: (dto.options ?? []).map((o) => ({
           id: o.id,
           label: o.label,
           value: o.value,
+          scoreDelta: o.scoreDelta ?? 0,
         })),
-        valueKind: dto.valueKind,
-        max: dto.answerType === AnswerType.Slider ? dto.sliderMax : undefined,
         min: dto.answerType === AnswerType.Slider ? dto.sliderMin : undefined,
-      };
-      data = d;
-      break;
+        max: dto.answerType === AnswerType.Slider ? dto.sliderMax : undefined,
+        mediaUrl: dto.mediaUrl ?? undefined,
+      }
+      data = d
+      break
     }
-    case "InfoPage": {
+
+    case 'InfoPage': {
       const d: InfoNodeData = {
         type: NodeType.Info,
         title: dto.title,
-        body: dto.description ?? "",
-        imageUrl: dto.mediaUrl ?? undefined,
-      };
-      data = d;
-      break;
+        body: dto.description ?? '',
+        mediaUrl: dto.mediaUrl ?? undefined,
+      }
+      data = d
+      break
     }
-    case "Offer":
-    default: {
-      // Read offer details from the primary linked offer returned by the API.
-      // Fall back to the first offer if none is marked primary.
+
+    case 'Offer': {
       const primaryOffer =
         (dto.nodeOffers ?? []).find((o) => o.isPrimary) ??
         dto.nodeOffers?.[0] ??
-        null;
-
+        null
+      const o = primaryOffer?.offer
       const d: OfferNodeData = {
         type: NodeType.Offer,
-        headline: dto.title,
-        description: primaryOffer?.offer.description ?? dto.description ?? "",
-        ctaText: primaryOffer?.offer.ctaText ?? "Get Started",
-        ctaUrl: primaryOffer?.offer.ctaUrl ?? undefined,
-        price: primaryOffer?.offer.price ?? undefined,
-        imageUrl: primaryOffer?.offer.imageUrl ?? undefined,
-        kitName: primaryOffer?.offer.physicalWellnessKitName ?? undefined,
-        kitContents: primaryOffer?.offer.physicalWellnessKitItems ?? undefined,
+        offerId: o?.id ?? undefined,
         nodeOfferId: primaryOffer?.id ?? undefined,
-        offerId: primaryOffer?.offer.offerId ?? undefined,
-      };
-      data = d;
-      break;
+        name: o?.name ?? dto.title,
+        slug: o?.slug ?? undefined,
+        headline: o?.headline ?? dto.title,
+        body: o?.body ?? dto.description ?? '',
+        imageUrl: o?.imageUrl ?? undefined,
+        ctaText: o?.ctaText ?? 'Book a call',
+        ctaUrl: o?.ctaUrl ?? undefined,
+        calendarUrl: o?.calendarUrl ?? undefined,
+        calendarProvider: (o?.calendarProvider ?? undefined) as CalendarProvider | undefined,
+        tier: (o?.tier ?? undefined) as QualificationTier | undefined,
+      }
+      data = d
+      break
+    }
+
+    case 'LeadCapture': {
+      const lc = dto.leadCapture
+      const d: LeadCaptureNodeData = {
+        type: NodeType.LeadCapture,
+        title: dto.title,
+        isRequired: lc?.isRequired ?? true,
+        fields: (lc?.fields ?? []).map((f) => ({
+          fieldType: f.fieldType as LeadCaptureField['fieldType'],
+          isRequired: f.isRequired,
+          displayOrder: f.displayOrder,
+          placeholder: f.placeholder ?? undefined,
+        })),
+      }
+      data = d
+      break
+    }
+
+    case 'Redirect': {
+      const rd = dto.redirect
+      const d: RedirectNodeData = {
+        type: NodeType.Redirect,
+        title: rd?.headline ?? dto.title,
+        description: rd?.body ?? dto.description ?? '',
+        tier: (rd?.tier ?? 'Cold') as QualificationTier,
+        redirectUrl: rd?.redirectUrl ?? undefined,
+        autoRedirectAfterSeconds: rd?.autoRedirectAfterSeconds ?? undefined,
+        links: (rd?.links ?? []).map((l) => ({
+          id: l.id,
+          label: l.label,
+          url: l.url,
+          displayOrder: l.displayOrder,
+        })),
+      }
+      data = d
+      break
+    }
+
+    default: {
+      const d: InfoNodeData = { type: NodeType.Info, title: dto.title, body: '' }
+      data = d
     }
   }
+
   return {
     id: dto.id,
     type: nodeType,
     position: { x: dto.positionX, y: dto.positionY },
     data,
-  };
+  }
 }
 
-/**
- * Convert a single `FlowEdgeDto` from the admin API into a ReactFlow `Edge`.
- *
- * Backend conditionsJson formats supported:
- *   1. Null / empty string  → unconditional (always)
- *   2. JSON array [{ AttributeKey, Value }, ...]  → canonical backend format
- *   3. JSON object { operator, rules: [{ attribute, op, value }] }  → legacy frontend format
- */
 export function flowEdgeToEdge(dto: FlowEdgeDto): Edge {
-  const priority = dto.priority ?? 0;
+  const priority = dto.priority ?? 0
 
-  const conditionJson = dto?.conditions as string ?? null;
-  let conditions: EdgeConditions = conditionJson ? JSON.parse(conditionJson) : { always: true, rules: [], priority };
-  let operator: "AND" | "OR" = "AND"; // default to AND if not specified
+  let conditions: EdgeConditions = { always: true, rules: [], priority }
+  let operator: 'AND' | 'OR' = 'AND'
 
   if (dto.conditions) {
     try {
-      const parsed = JSON.parse(dto.conditions) as { rules?: unknown, operator?: "AND" | "OR" };
+      const parsed = JSON.parse(dto.conditions) as {
+        rules?: Array<{
+          AttributeKey?: string
+          Operator?: string
+          Value?: string
+          ValueTo?: string
+        }>
+        operator?: 'AND' | 'OR'
+      }
 
-      operator = parsed.operator || "AND";
-      if (parsed) {
-        type BackendRule = {
-          AttributeKey?: string;
-          Operator?: string;
-          Value?: string;
-          ValueTo?: string;
-          rules?: unknown;
-        };
-        const rules = (parsed.rules as BackendRule[])
+      operator = parsed.operator ?? 'AND'
+
+      if (parsed.rules && Array.isArray(parsed.rules)) {
+        const rules = parsed.rules
           .filter((r) => r.AttributeKey)
           .map((r) => ({
             attributeKey: r.AttributeKey!,
-            operator: (r.Operator ?? "eq") as EdgeOperator,
-            value: r.Value ?? "",
+            operator: (r.Operator ?? 'eq') as EdgeOperator,
+            value: r.Value ?? '',
             ...(r.ValueTo !== undefined ? { valueTo: r.ValueTo } : {}),
-          }));
+          }))
 
         if (rules.length > 0) {
-          conditions = { always: false, rules, priority };
-        }
-      } else if (
-        parsed &&
-        typeof parsed === "object" &&
-        !Array.isArray(parsed)
-      ) {
-        const legacy = parsed as {
-          rules?: Array<{ rules: { AttributeKey?: string; Operator?: string; Value?: string; ValueTo?: string } }>;
-        };
-        const rules = (legacy.rules ?? [])
-          .filter((r) => r.rules.AttributeKey)
-          .map((r) => ({
-            attributeKey: r.rules.AttributeKey!,
-            operator: (r.rules.Operator ?? "eq") as EdgeOperator,
-            value: r.rules.Value ?? "",
-          }));
-
-
-        if (rules.length > 0) {
-          conditions = { always: false, rules, priority };
+          conditions = { always: false, rules, priority }
         }
       }
     } catch {
@@ -174,156 +198,176 @@ export function flowEdgeToEdge(dto: FlowEdgeDto): Edge {
   }
 
   const OP_SYM: Record<string, string> = {
-    eq: "=", neq: "≠", gt: ">", gte: "≥", lt: "<", lte: "≤",
-    between: "between", in: "in", not_in: "not in", contains: "contains",
-  };
-  let label: string;
-  if (conditions.always || conditions.rules.length === 0) {
-    label = priority > 0 ? `(always) · p${priority}` : "(always)";
-  } else {
-    const rulesLabel = conditions.rules
-      .map((r) => {
-        const operator = r.operator ?? "eq";
-        const sym = OP_SYM[operator] ?? operator;
-        if (operator === "between") return `${r.attributeKey} ${sym} ${r.value}–${r.valueTo ?? "?"}`;
-        if (operator === "in" || operator === "not_in") return `${r.attributeKey} ${sym} [${r.value}]`;
-        return `${r.attributeKey} ${sym} ${r.value}`;
-      })
-      .join(" AND ");
-    label = priority > 0 ? `${rulesLabel} · p${priority}` : rulesLabel;
+    eq: '=', neq: '≠', gt: '>', gte: '≥', lt: '<', lte: '≤',
+    between: 'between', in: 'in', not_in: 'not in', contains: 'contains',
   }
 
-  console.log(conditions);
-  
+  let label: string
+  if (conditions.always || conditions.rules.length === 0) {
+    label = priority > 0 ? `(always) · p${priority}` : '(always)'
+  } else {
+    const sep = operator === 'OR' ? ' OR ' : ' AND '
+    const rulesLabel = conditions.rules
+      .map((r) => {
+        const op = OP_SYM[r.operator ?? 'eq'] ?? r.operator
+        if (r.operator === 'between') return `${r.attributeKey} ${op} ${r.value}–${r.valueTo ?? '?'}`
+        if (r.operator === 'in' || r.operator === 'not_in') return `${r.attributeKey} ${op} [${r.value}]`
+        return `${r.attributeKey} ${op} ${r.value}`
+      })
+      .join(sep)
+    label = priority > 0 ? `${rulesLabel} · p${priority}` : rulesLabel
+  }
 
   return {
     id: dto.id,
     source: dto.sourceNodeId,
     target: dto.targetNodeId,
-    type: "conditionEdge",
+    type: 'conditionEdge',
     markerEnd: { type: MarkerType.ArrowClosed, width: 18, height: 18 },
     data: { label, conditions, operator },
-  };
+  }
 }
 
 // ─── DAG → API ────────────────────────────────────────────────────────────────
 
-/**
- * Map the internal `NodeType` enum back to the API `FlowNodeType` string.
- */
 function nodeTypeToApiType(type: NodeType): AdminFlowNodeType {
-  if (type === NodeType.Info) return "InfoPage";
-  if (type === NodeType.Offer) return "Offer";
-  return "Question";
+  switch (type) {
+    case NodeType.Info:         return 'InfoPage'
+    case NodeType.Offer:        return 'Offer'
+    case NodeType.LeadCapture:  return 'LeadCapture'
+    case NodeType.Redirect:     return 'Redirect'
+    default:                    return 'Question'
+  }
 }
 
-/**
- * Build a `CreateNodeRequest` payload from a ReactFlow `Node<DagNodeData>`.
- *
- * Note: answer options for question nodes are managed via the separate options
- * API (`POST /api/admin/nodes/{nodeId}/options`) and are not part of this
- * request.  Add/remove/reorder options using `useCreateOption` / `useDeleteOption`.
- */
-export function nodeToCreateRequest(
-  node: Node<DagNodeData>,
-): CreateNodeRequest {
-  const { data, position } = node;
+export function nodeToCreateRequest(node: Node<DagNodeData>): CreateNodeRequest {
+  const { data, position } = node
   const base = {
     type: nodeTypeToApiType(data.type),
     positionX: Math.round(position.x),
     positionY: Math.round(position.y),
-  } as const;
+  } as const
 
   switch (data.type) {
     case NodeType.Question: {
-      let slider = data.type === NodeType.Question && data.answerType === AnswerType.Slider
-      ? { SliderMin: data.min ?? 0, SliderMax: data.max ?? 10 }
-      : {};
-
+      const isSlider = data.answerType === AnswerType.Slider
       return {
         ...base,
-        title: data.questionText,
-        attributeKey: data.attribute,
-        description: '',
+        title: data.title,
+        attributeKey: data.attributeKey,
+        description: data.description || undefined,
+        mediaUrl: data.mediaUrl || undefined,
         answerType: data.answerType,
-        valueKind: data.valueKind || ValueKind.Text,
-        ...slider,
-      };
+        valueKind: data.valueKind ?? ValueKind.Text,
+        ...(isSlider ? { SliderMin: data.min ?? 0, SliderMax: data.max ?? 10 } : {}),
+      }
     }
+
     case NodeType.Info:
       return {
         ...base,
         title: data.title,
         description: data.body || undefined,
-        mediaUrl: data.imageUrl || undefined,
-      };
-    case NodeType.Offer: {
+        mediaUrl: data.mediaUrl || undefined,
+      }
+
+    case NodeType.Offer:
       return {
         ...base,
-        title: data.headline,
-        description: data.description || undefined,
+        title: data.name || data.headline,
         offer: {
-          name: data.headline,
+          slug: data.slug || undefined,
+          name: data.name || data.headline,
+          headline: data.headline || undefined,
+          body: data.body || undefined,
+          imageUrl: data.imageUrl || undefined,
+          calendarUrl: data.calendarUrl ?? undefined,
+          calendarProvider: data.calendarProvider ?? undefined,
+          tier: data.tier || undefined,
           ctaText: data.ctaText || undefined,
           ctaUrl: data.ctaUrl || undefined,
-          price: data.price,
-          imageUrl: data.imageUrl || undefined,
-          physicalWellnessKitName: data.kitName || undefined,
-          physicalWellnessKitItems: data.kitContents || undefined,
-          description: data.description || undefined,
+          isPrimary: true,
         },
-      };
-    }
+      }
+
+    case NodeType.LeadCapture:
+      return {
+        ...base,
+        title: data.title,
+        isRequired: data.isRequired,
+        fields: data.fields.map((f, i) => ({
+          fieldType: f.fieldType,
+          isRequired: f.isRequired,
+          displayOrder: f.displayOrder ?? i,
+          placeholder: f.placeholder || undefined,
+        })),
+      }
+
+    case NodeType.Redirect:
+      return {
+        ...base,
+        title: data.title,
+        description: data.description || undefined,
+        tier: data.tier,
+        redirectUrl: data.redirectUrl || undefined,
+        autoRedirectAfterSeconds: data.autoRedirectAfterSeconds ?? -1,
+        links: data.links.map((l) => ({ label: l.label, url: l.url })),
+      }
   }
 }
 
-/**
- * Build an `UpdateNodeRequest` payload from a ReactFlow `Node<DagNodeData>`.
- *
- * Note: answer options are a separate resource and are not updated here.
- * Use `useCreateOption` / `useUpdateOption` / `useDeleteOption` for that.
- */
-export function nodeToUpdateRequest(
-  node: Node<DagNodeData>,
-): UpdateNodeRequest {
-  const { data } = node;
-
-    let slider = data.type === NodeType.Question && data.answerType === AnswerType.Slider
-      ? { SliderMin: data.min ?? 0, SliderMax: data.max ?? 10 }
-      : {};
+export function nodeToUpdateRequest(node: Node<DagNodeData>): UpdateNodeRequest {
+  const { data } = node
 
   switch (data.type) {
     case NodeType.Question: {
+      const isSlider = data.answerType === AnswerType.Slider
       return {
-        title: data.questionText,
-        attributeKey: data.attribute,
-        description: '',
+        title: data.title,
+        description: data.description || undefined,
+        mediaUrl: data.mediaUrl || undefined,
         answerType: data.answerType,
-        valueKind: data.valueKind || ValueKind.Text,
-        ...slider,
-      };
+        valueKind: data.valueKind ?? ValueKind.Text,
+        ...(isSlider ? { SliderMin: data.min ?? 0, SliderMax: data.max ?? 10 } : {}),
+      }
     }
+
     case NodeType.Info:
       return {
         title: data.title,
         description: data.body || undefined,
-        mediaUrl: data.imageUrl || undefined,
-      };
-    case NodeType.Offer: {
+        mediaUrl: data.mediaUrl || undefined,
+      }
+
+    case NodeType.Offer:
       return {
-        title: data.headline,
-        description: data.description || undefined,
+        title: data.name || data.headline,
         offer: {
-          name: data.headline,
+          headline: data.headline || undefined,
+          body: data.body || undefined,
+          imageUrl: data.imageUrl || undefined,
+          calendarUrl: data.calendarUrl ?? undefined,
+          calendarProvider: data.calendarProvider ?? undefined,
+          tier: data.tier || undefined,
           ctaText: data.ctaText || undefined,
           ctaUrl: data.ctaUrl || undefined,
-          price: data.price,
-          imageUrl: data.imageUrl || undefined,
-          physicalWellnessKitName: data.kitName || undefined,
-          physicalWellnessKitItems: data.kitContents || undefined,
-          description: data.description || undefined,
         },
-      };
-    }
+      }
+
+    case NodeType.LeadCapture:
+      return {
+        title: data.title,
+        isRequired: data.isRequired,
+      }
+
+    case NodeType.Redirect:
+      return {
+        title: data.title,
+        description: data.description || undefined,
+        tier: data.tier,
+        redirectUrl: data.redirectUrl || undefined,
+        autoRedirectAfterSeconds: data.autoRedirectAfterSeconds ?? -1,
+        // links are managed separately via /redirect-links endpoints
+      }
   }
 }

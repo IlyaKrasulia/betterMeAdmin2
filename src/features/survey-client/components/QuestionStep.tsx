@@ -16,7 +16,7 @@ interface QuestionStepProps {
 export function QuestionStep({ data, onAnswer }: QuestionStepProps) {
   const [selected, setSelected] = useState<string[]>([])
 
-  const { questionText, answerType, options, mediaUrl } = data  
+  const { title, answerType, options, mediaUrl } = data
 
   // Slider: discrete (has options) vs numeric (empty options, uses min/max)
   const isNumericSlider = answerType === AnswerType.Slider && (!options || options.length === 0)
@@ -54,8 +54,8 @@ export function QuestionStep({ data, onAnswer }: QuestionStepProps) {
 
   return (
     <Wrapper>
-      {mediaUrl && <QuestionMedia src={mediaUrl} alt={questionText} />}
-      <QuestionText>{questionText}</QuestionText>
+      {mediaUrl && <QuestionMedia src={mediaUrl} alt={title} />}
+      <QuestionText>{title}</QuestionText>
 
       {isMulti && (
         <HintText>Select all that apply</HintText>
@@ -76,7 +76,6 @@ export function QuestionStep({ data, onAnswer }: QuestionStepProps) {
                 whileTap={{ scale: 0.98 }}
                 type="button"
               >
-                {opt.icon && <OptionIcon>{opt.icon}</OptionIcon>}
                 <OptionLabel $selected={isMulti ? isSelected : false}>
                   {opt.label}
                 </OptionLabel>
@@ -93,16 +92,7 @@ export function QuestionStep({ data, onAnswer }: QuestionStepProps) {
           transition={{ duration: 0.3 }}
         >
           <SliderCurrentLabel>
-            {isNumericSlider ? (
-              sliderValue
-            ) : (
-              <>
-                {options[sliderValue]?.icon && (
-                  <SliderEmoji>{options[sliderValue].icon}</SliderEmoji>
-                )}
-                {options[sliderValue]?.label}
-              </>
-            )}
+            {isNumericSlider ? sliderValue : options[sliderValue]?.label}
           </SliderCurrentLabel>
 
           {isNumericSlider ? (

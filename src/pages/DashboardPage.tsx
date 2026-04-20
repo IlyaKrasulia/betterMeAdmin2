@@ -39,6 +39,15 @@ import type { AppTheme } from "@shared/theme/theme";
 
 type ColorKey = "accent" | "success" | "error" | "warning" | "info";
 
+const page = {
+  hidden: {},
+  show: { transition: { staggerChildren: 0.07 } },
+}
+const item = {
+  hidden: { opacity: 0, y: 16 },
+  show:   { opacity: 1, y: 0, transition: { duration: 0.22, ease: [0.25, 0.1, 0.25, 1] as const } },
+}
+
 export function DashboardPage() {
   const theme = useTheme() as AppTheme;
   const navigate = useNavigate();
@@ -167,7 +176,8 @@ export function DashboardPage() {
 
   return (
     <AdminLayout>
-      <PageContent>
+      <PageContent variants={page} initial="hidden" animate="show">
+        <motion.div variants={item}>
         <PageHeader>
           <TitleBlock>
             <PageTitle>Dashboard</PageTitle>
@@ -183,8 +193,10 @@ export function DashboardPage() {
             Create Survey
           </Button>
         </PageHeader>
+        </motion.div>
 
         {/* Unified compact stats */}
+        <motion.div variants={item}>
         <DashKpiGrid>
           {[
             { label: "Total Surveys",    value: flows.length,                                               icon: <LayoutGrid size={15} />,   color: "accent"   as ColorKey },
@@ -211,9 +223,11 @@ export function DashboardPage() {
             </DashKpiCard>
           ))}
         </DashKpiGrid>
+        </motion.div>
 
         {/* Offer stats */}
         {sortedOffers.length > 0 && (
+          <motion.div variants={item}>
           <>
             <SectionHeader>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
@@ -369,6 +383,7 @@ export function DashboardPage() {
                     initial={{ opacity: 0, x: -8 }}
                     animate={{ opacity: 1, x: 0 }}
                     transition={{ delay: i * 0.04 }}
+                    onClick={() => window.open(`/offer-preview?offerId=${offer.offerId}`, '_blank', 'noopener,noreferrer')}
                   >
                     <OfferColName>
                       <OfferRowName>{offer.offerName}</OfferRowName>
@@ -423,9 +438,11 @@ export function DashboardPage() {
               </OfferExpandBtn>
             )}
           </>
+          </motion.div>
         )}
 
         {/* Surveys list */}
+        <motion.div variants={item}>
         <SectionHeader>
           <SectionTitle>
             <LayoutGrid size={18} style={{ verticalAlign: "middle", marginRight: 8 }} />
@@ -497,9 +514,11 @@ export function DashboardPage() {
             ))}
           </Grid>
         )}
+        </motion.div>
 
         {/* Drop-off analysis */}
         {allDropOffs.length > 0 && (
+          <motion.div variants={item}>
           <>
             <SectionHeader>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -567,6 +586,7 @@ export function DashboardPage() {
               </OfferExpandBtn>
             )}
           </>
+          </motion.div>
         )}
 
         <CreateSurveyModal
@@ -593,7 +613,7 @@ const colorMap = (theme: AppTheme, color: ColorKey) => {
 
 /* ─── Styled Components ────────────────────────────────────────────── */
 
-const PageContent = styled.div`
+const PageContent = styled(motion.div)`
   padding: 32px 40px;
   flex: 1;
   max-width: 1400px;
@@ -817,6 +837,7 @@ const OfferRow = styled(motion.div)`
   padding-bottom: 12px;
   border-bottom: 1px solid ${({ theme }) => theme.colors.border};
   transition: background ${({ theme }) => theme.transitions.fast};
+  cursor: pointer;
 
   &:last-child {
     border-bottom: none;

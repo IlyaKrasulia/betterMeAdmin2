@@ -19,8 +19,8 @@ export function InfoStep({ data, onContinue }: InfoStepProps) {
         animate={{ scale: 1, opacity: 1 }}
         transition={{ type: "spring", stiffness: 260, damping: 20 }}
       >
-        {data.imageUrl ? (
-          <InfoImage src={data.imageUrl} alt={data.title} />
+        {data.mediaUrl ? (
+          <InfoImage src={data.mediaUrl} alt={data.title} />
         ) : (
           "🌟"
         )}

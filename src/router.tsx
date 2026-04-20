@@ -7,11 +7,14 @@ import {
   redirect,
 } from '@tanstack/react-router'
 import { motion } from 'framer-motion'
+import { LandingPage } from '@pages/LandingPage'
 import { LoginPage } from '@pages/LoginPage'
+import { SignUpPage } from '@pages/SignUpPage'
 import { DashboardPage } from '@pages/DashboardPage'
 import { DagEditorPage } from '@pages/DagEditorPage'
 import { SurveyPage } from '@pages/SurveyPage'
 import { FlowStatsPage } from '@pages/FlowStatsPage'
+import { OfferPreviewPage } from '@pages/OfferPreviewPage'
 import { useAuthStore } from '@features/auth/store/auth.store'
 
 // ─── Root route ───────────────────────────────────────────────────────────────
@@ -46,7 +49,7 @@ function PageWrapper({ children }: { children: React.ReactNode }) {
 function requireAuth() {
   const { isAuthenticated } = useAuthStore.getState()
   if (!isAuthenticated) {
-    throw redirect({ to: '/login' })
+    throw redirect({ to: '/' })
   }
 }
 
@@ -63,9 +66,11 @@ const indexRoute = createRoute({
   path: '/',
   beforeLoad: () => {
     const { isAuthenticated } = useAuthStore.getState()
-    throw redirect({ to: isAuthenticated ? '/dashboard' : '/login' })
+    if (isAuthenticated) {
+      throw redirect({ to: '/dashboard' })
+    }
   },
-  component: () => null,
+  component: () => <LandingPage />,
 })
 
 const loginRoute = createRoute({
@@ -75,6 +80,17 @@ const loginRoute = createRoute({
   component: () => (
     <PageWrapper>
       <LoginPage />
+    </PageWrapper>
+  ),
+})
+
+const signupRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/signup',
+  beforeLoad: requireGuest,
+  component: () => (
+    <PageWrapper>
+      <SignUpPage />
     </PageWrapper>
   ),
 })
@@ -112,6 +128,13 @@ const statsRoute = createRoute({
   ),
 })
 
+// Public landing page route — always accessible
+const landingRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/landing',
+  component: () => <LandingPage />,
+})
+
 // Public survey-taking route — no authentication required
 const surveyRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -123,14 +146,33 @@ const surveyRoute = createRoute({
   ),
 })
 
+// Offer preview — opened in new tab from the DAG editor
+// Accepts ?offerId=<uuid> (fetch from backend) or ?data=<base64> (inline data)
+const offerPreviewRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: '/offer-preview',
+  validateSearch: (search: Record<string, unknown>) => ({
+    offerId: typeof search.offerId === 'string' ? search.offerId : undefined,
+    data: typeof search.data === 'string' ? search.data : undefined,
+  }),
+  component: () => (
+    <PageWrapper>
+      <OfferPreviewPage />
+    </PageWrapper>
+  ),
+})
+
 // ─── Router ──────────────────────────────────────────────────────────────────
 const routeTree = rootRoute.addChildren([
   indexRoute,
+  landingRoute,
   loginRoute,
+  signupRoute,
   dashboardRoute,
   editorRoute,
   statsRoute,
   surveyRoute,
+  offerPreviewRoute,
 ])
 
 export const router = createRouter({ routeTree })

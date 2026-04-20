@@ -2,6 +2,7 @@ import { memo } from 'react'
 import { getBezierPath, EdgeLabelRenderer, BaseEdge } from 'reactflow'
 import type { EdgeProps } from 'reactflow'
 import { useTheme } from 'styled-components'
+import { useDagStore } from '../store/dag.store'
 
 export interface ConditionEdgeData {
   label?: string
@@ -16,11 +17,25 @@ export const ConditionEdge = memo(function ConditionEdge({
   targetY,
   sourcePosition,
   targetPosition,
-  data,
+  data: propData,
   markerEnd,
   selected,
 }: EdgeProps<ConditionEdgeData>) {
   const theme = useTheme()
+
+  /**
+   * Read edge data directly from the Zustand store so that programmatic
+   * updates (e.g. option-delete cleanup) are reflected immediately.
+   *
+   * React Flow's controlled-mode edge renderer can lag behind when only
+   * `data` changes — subscribing here guarantees the canvas label is always
+   * in sync with the store without any extra React Flow prop-propagation
+   * ceremony. The selector is cheap: it returns the same edge object reference
+   * for unchanged edges, so other edges are NOT re-rendered.
+   */
+  const storeEdge = useDagStore((s) => s.edges.find((e) => e.id === id))
+  const data = (storeEdge?.data as ConditionEdgeData | undefined) ?? propData
+
   const [edgePath, labelX, labelY] = getBezierPath({
     sourceX,
     sourceY,
